@@ -131,6 +131,16 @@ jobs:
           # 产物大小一览（Windows 的 Git-Bash 未必有 file 命令，故只用 ls）
           ls -la dist/
 
+      - name: 可执行文件启动检查
+        run: |
+          python - <<'PY'
+          import pathlib
+          import subprocess
+          binaries = list(pathlib.Path("dist").glob("zhihu-downloader-*"))
+          assert len(binaries) == 1, binaries
+          subprocess.run([str(binaries[0].resolve()), "--version"], check=True, timeout=120)
+          PY
+
       - name: 未签名产物提示（SmartScreen / Gatekeeper，README 详述由 D1 维护）
         run: |
           echo "=================================================================="

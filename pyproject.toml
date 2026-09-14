@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zhihu-salt-novel-downloader"
-version = "5.0.0"
+version = "5.0.1"
 description = "知乎盐选小说下载器 v5 —— 双击即用的个人备份工具：扫码登录、整本下载、断点续传、EPUB 精排、书架追更"
 readme = "README.md"
 license = { text = "MIT" }
@@ -42,8 +42,8 @@ dev = [
 zhihu-downloader = "zhihu_downloader.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/xfengyin/zhihu-salt-novel-downloader"
-Issues = "https://github.com/xfengyin/zhihu-salt-novel-downloader/issues"
+Homepage = "https://github.com/SiwuXue/yanxuan-reader"
+Issues = "https://github.com/SiwuXue/yanxuan-reader/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/zhihu_downloader"]

@@ -119,7 +119,8 @@ binaries = []
 
 # 运行时 5 依赖（铁律 1）逐个 collect_all：数据文件 + 子模块一网打尽。
 # v4 教训：except Exception: pass 让缺依赖的残包一路绿灯发到用户手里。
-for package in ("fastapi", "uvicorn", "ebooklib", "bs4", "requests"):
+for package in ("fastapi", "uvicorn", "ebooklib", "bs4", "requests",
+                "fontTools", "PIL", "ddddocr", "onnxruntime"):
     try:
         pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
     except Exception as exc:  # 捕获只为换更有用的报错，随后立即 raise——绝不吞

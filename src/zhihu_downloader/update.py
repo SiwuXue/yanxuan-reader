@@ -41,7 +41,7 @@ __all__ = [
 
 #: GitHub Releases 最新版的只读查询接口（规格 §2.16 指定地址）。
 RELEASES_API_URL = (
-    "https://api.github.com/repos/xfengyin/zhihu-salt-novel-downloader/releases/latest"
+    "https://api.github.com/repos/SiwuXue/yanxuan-reader/releases/latest"
 )
 
 #: 单次请求超时秒数（§2.16：10s，超过即放弃，不阻塞主流程）。
@@ -63,11 +63,11 @@ MAX_VERSION_DIGITS = 12
 #: 可信发布页前缀（R2 #9b）。远端 html_url 必须以此为前缀，否则整个丢弃：
 #: 只提示本仓库的 releases 页，避免被改包/中间人换成钓鱼域名。
 RELEASE_URL_PREFIX = (
-    "https://github.com/xfengyin/zhihu-salt-novel-downloader/releases/"
+    "https://github.com/SiwuXue/yanxuan-reader/releases/"
 )
 
 #: 同一前缀的"路径部分"写法，用于 urlsplit 之后的二次核对。
-_RELEASE_PATH = "/xfengyin/zhihu-salt-novel-downloader/releases/"
+_RELEASE_PATH = "/SiwuXue/yanxuan-reader/releases/"
 
 #: 控制台文本最大长度（R2 #9b：远端字段长度不可信，防刷屏/防终端缓冲区打爆）。
 MAX_HINT_TEXT = 200

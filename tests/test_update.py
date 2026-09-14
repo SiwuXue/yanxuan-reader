@@ -64,7 +64,7 @@ class UrlopenRecorder:
 
 #: 合法的发布页 URL（R2 #9b 起 html_url 要过本站 releases 前缀白名单，
 #: 夹具必须用可信形态，否则所有用例都在偷偷测"丢弃链接"分支）。
-GOOD_URL = "https://github.com/xfengyin/zhihu-salt-novel-downloader/releases/tag/v5.1.0"
+GOOD_URL = "https://github.com/SiwuXue/yanxuan-reader/releases/tag/v5.1.0"
 
 
 def release(tag: str = "v5.1.0", url: str = GOOD_URL) -> dict[str, Any]:
@@ -186,7 +186,7 @@ def test_check_tool_update_hits_specified_url_with_10s_timeout(monkeypatch: pyte
     request = recorder.requests[0]
     assert request.full_url == updater.RELEASES_API_URL
     assert request.full_url == (
-        "https://api.github.com/repos/xfengyin/zhihu-salt-novel-downloader/releases/latest"
+        "https://api.github.com/repos/SiwuXue/yanxuan-reader/releases/latest"
     )
     assert recorder.timeouts == [updater.REQUEST_TIMEOUT]
     assert updater.REQUEST_TIMEOUT == 10.0
@@ -450,16 +450,16 @@ def test_junk_version_can_never_claim_to_be_newer() -> None:
     [
         (GOOD_URL, True),
         (GOOD_URL + "?expanded=1", True),
-        ("https://github.com/xfengyin/zhihu-salt-novel-downloader/releases/latest", True),
-        ("http://github.com/xfengyin/zhihu-salt-novel-downloader/releases/tag/v1", False),
+        ("https://github.com/SiwuXue/yanxuan-reader/releases/latest", True),
+        ("http://github.com/SiwuXue/yanxuan-reader/releases/tag/v1", False),
         ("https://evil.com/x", False),
-        ("https://github.com/xfengyin/zhihu-salt-novel-downloader/releases.evil.com/x", False),
-        ("https://github.com@evil.com/xfengyin/zhihu-salt-novel-downloader/releases/tag/v1", False),
-        ("https://evil.com/#https://github.com/xfengyin/zhihu-salt-novel-downloader/releases/tag/v1", False),
-        ("https://github.com:8443/xfengyin/zhihu-salt-novel-downloader/releases/tag/v1", False),
-        ("https://github.com:abc/xfengyin/zhihu-salt-novel-downloader/releases/tag/v1", False),
+        ("https://github.com/SiwuXue/yanxuan-reader/releases.evil.com/x", False),
+        ("https://github.com@evil.com/SiwuXue/yanxuan-reader/releases/tag/v1", False),
+        ("https://evil.com/#https://github.com/SiwuXue/yanxuan-reader/releases/tag/v1", False),
+        ("https://github.com:8443/SiwuXue/yanxuan-reader/releases/tag/v1", False),
+        ("https://github.com:abc/SiwuXue/yanxuan-reader/releases/tag/v1", False),
         (GOOD_URL + chr(27) + "]52;c;AAAA", False),
-        ("https://github.com/xfengyin/zhihu-salt-novel-downloader/releases/" + chr(10) + "tag/v1", False),
+        ("https://github.com/SiwuXue/yanxuan-reader/releases/" + chr(10) + "tag/v1", False),
         ("", False),
         (None, False),
     ],

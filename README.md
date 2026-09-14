@@ -1,3 +1,17 @@
+# yanxuan-reader · 盐选书房
+
+当前版本 **v5.0.1**。从 [Releases](https://github.com/SiwuXue/yanxuan-reader/releases/latest) 下载对应平台的可执行文件。Windows 下载 `.exe` 后双击启动，浏览器会打开本地 Web 页面；无需安装 Python。
+
+支持字体 OCR 还原、EPUB/TXT/Markdown 导出及本地书架。旧版已缓存的乱码正文，请取消“续传”后重新下载。OCR 识别仍可能存在个别错字。
+
+发布方式：同步修改 `pyproject.toml`、`src/zhihu_downloader/__init__.py` 的版本号及 `CHANGELOG.md`，提交后推送 `vX.Y.Z` 标签。GitHub Actions 会校验版本、运行测试、构建 Windows x64 / Linux x64 / macOS arm64，并发布三个可执行文件和 SHA256 校验清单。
+
+基于 [xfengyin/zhihu-salt-novel-downloader](https://github.com/xfengyin/zhihu-salt-novel-downloader) 开发，保留原有许可证和历史。字体 OCR 思路参考 [moran69/yanxuan](https://github.com/moran69/yanxuan)。
+
+---
+
+以下为上游历史文档，部分目录及功能描述不适用于当前版本。
+
 # zhihu-salt-novel-downloader
 
 > 🚀 **v4 极简版（推荐）**：快速上手请用极简版，见 [`simple/README.md`](simple/README.md) —— 扫码登录、下载、导出，1 分钟跑起来。
@@ -51,7 +65,7 @@
 
 ### 三端下载（GitHub Releases）
 
-前往 [Releases](https://github.com/xfengyin/zhihu-salt-novel-downloader/releases) 下载最新版：
+前往 [Releases](https://github.com/SiwuXue/yanxuan-reader/releases) 下载最新版：
 
 | 端 | 平台 | 文件 |
 |----|------|------|
