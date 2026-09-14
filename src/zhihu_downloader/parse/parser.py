@@ -20,6 +20,7 @@ from bs4 import BeautifulSoup, Tag
 from ..errors import ParseError
 from ..types import Article, Block, ChapterRef
 from .classifier import classify
+from .fontdecode import deobfuscate
 
 __all__ = ["parse_article", "parse_toc", "parse_page_title"]
 
@@ -149,6 +150,7 @@ def parse_article(html: str, url: str = "") -> Article:
     Raises:
         ParseError: 找不到标题或正文（中文消息含下一步建议）。
     """
+    html = deobfuscate(html)  # 先还原知乎盐选字体反爬乱码，再进解析
     soup = _soup(html)
     title = _extract_title(soup)
 
@@ -239,6 +241,6 @@ def parse_toc(html: str, base_url: str) -> list[ChapterRef]:
 def parse_page_title(html: str) -> str:
     """仅提取页面标题；找不到时返回空字符串（不抛异常）。"""
     try:
-        return _extract_title(_soup(html))
+        return _extract_title(_soup(deobfuscate(html)))
     except ParseError:
         return ""

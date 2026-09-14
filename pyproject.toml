@@ -25,6 +25,9 @@ dependencies = [
     "fastapi>=0.109.0",
     "uvicorn>=0.27.0",          # 不拉 [standard]：避免 uvloop/httptools/watchfiles 等 26 包传递依赖
     "ebooklib>=0.18",
+    "fonttools>=4.0",           # 知乎盐选字体反爬解码：读取 cmap / uniXXXX 字形名
+    "Pillow>=10.0",             # 字体反爬解码：自定义字体逐字形渲染（OCR 回退）
+    "ddddocr",                  # 字体反爬解码：字形名随机化时用 OCR 还原真实汉字
 ]
 
 [project.optional-dependencies]
