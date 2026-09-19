@@ -669,10 +669,8 @@ textarea { resize: vertical; min-height: 96px; font-family: ui-monospace, Consol
 .format-list b { flex: 0 0 74px; font-weight: 600; }
 .format-list code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 210px; }
 
-.about-line { font-size: .88rem; }
-
-/* 关于区块：一句话介绍 + 外链列表（仓库 / 博客 / 爱发电） */
-.about-intro { margin: 6px 0 10px; font-size: .82rem; color: var(--text-muted); line-height: 1.65; }
+/* 关于卡片（主页面右栏）：一句话介绍 + 外链列表（仓库 / 博客 / 爱发电） */
+.about-intro { margin: 0 0 10px; font-size: .82rem; color: var(--text-muted); line-height: 1.65; }
 .about-links { margin: 0 0 10px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .about-link {
   display: flex; align-items: baseline; gap: 8px;
@@ -690,6 +688,7 @@ textarea { resize: vertical; min-height: 96px; font-family: ui-monospace, Consol
 .about-link-label { font-weight: 600; flex: 0 0 auto; }
 .about-link-note { color: var(--text-muted); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .about-link::after { content: "↗"; color: var(--text-muted); font-size: .8em; flex: 0 0 auto; }
+.about-foot-note { margin-top: 0; }
 
 .confirm-box {
   margin-top: 12px;
