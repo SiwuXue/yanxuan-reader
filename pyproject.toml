@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zhihu-salt-novel-downloader"
-version = "5.0.2"
+version = "5.0.3"
 description = "知乎盐选小说下载器 v5 —— 双击即用的个人备份工具：扫码登录、整本下载、断点续传、EPUB 精排、书架追更"
 readme = "README.md"
 license = { text = "MIT" }
