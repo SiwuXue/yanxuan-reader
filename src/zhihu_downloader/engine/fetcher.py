@@ -137,7 +137,12 @@ def _resolve_book(client: ZhihuClient, url: str) -> tuple[BookMeta, dict[str, st
     Raises:
         同 resolve_book。
     """
-    from zhihu_downloader.parse.parser import parse_article, parse_page_title, parse_toc
+    from zhihu_downloader.parse.parser import (
+        detect_gate_page,
+        parse_article,
+        parse_page_title,
+        parse_toc,
+    )
     from zhihu_downloader.parse.urltype import detect, friendly_hint
 
     url_type = detect(url)
@@ -168,6 +173,14 @@ def _resolve_book(client: ZhihuClient, url: str) -> tuple[BookMeta, dict[str, st
     # parse_toc 返回 [] 表示确实解析不到章节（它自己不抛错），由本层负责报错。
     chapters = _normalize_chapters(parse_toc(html, url))
     if not chapters:
+        if detect_gate_page(html):
+            # 登录态失效时知乎返回 HTTP 200 的登录/验证页，里面一个章节链接都没有。
+            # 不说清这一点，用户只会以为「链接给错了」而去反复换链接。
+            raise ParseError(
+                f"该链接返回的是知乎登录/人机验证页，不是专栏目录（页面里没有任何章节链接）：{url}。"
+                "请重新登录（扫码或重新导入 Cookie）后重试；"
+                "也可能是短时间内请求过多被风控，稍等几分钟再试。"
+            )
         raise ParseError(
             f"未在专栏页解析到任何章节链接：{url}。"
             "请确认链接是否为专栏目录页，以及登录 Cookie 是否仍然有效。"
@@ -625,6 +638,11 @@ def _collect_articles(
     给了 refetch 就现场重抓该章（fetch + parse + clean）并回填缓存；
     没给 refetch 时（防御性兜底）才报 ParseError。
 
+    「可用」的口径与 CheckpointStore.get_done_urls 一致：含可用正文
+    （`Article.has_body_text`）。登录/验证闸门页存下的空壳（只有图片、没有
+    一个字）视同缓存缺失，一律走 refetch —— 这是导出前的最后一道闸，
+    保证任何路径都不会把空白章节送进成品。
+
     Args:
         store: 断点存储（续传进来的章节从这里读回）。
         meta: 已解析的目录（决定顺序）。
@@ -632,17 +650,23 @@ def _collect_articles(
         refetch: 缓存不可用时的自愈重抓函数（fetch → parse → clean → 回填）。
 
     Raises:
-        ParseError: 某章正文既不在内存也不在缓存，且未提供 refetch。
+        ParseError: 某章正文既不在内存也不在缓存（或缓存是空壳），且未提供 refetch。
     """
     collected = collected or {}
+
+    def usable(article: Article | None) -> bool:
+        return article is not None and article.has_body_text()
+
     articles: list[Article] = []
     for chapter in meta.chapters:
         article = collected.get(chapter.url)
-        if article is None:
+        if not usable(article):
             article = store.get_article(chapter.url)
-        if article is None and refetch is not None:
+        if not usable(article) and refetch is not None:
+            if article is not None:
+                logger.warning("章节缓存是空壳正文（无文字），已重取：《%s》", chapter.title)
             article = refetch(chapter)
-        if article is None:
+        if not usable(article):
             raise ParseError(
                 f"章节缓存缺失：《{chapter.title}》（{chapter.url}）。"
                 "请加 --no-resume 重新下载整本。"

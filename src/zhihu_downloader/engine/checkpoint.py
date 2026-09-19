@@ -11,6 +11,8 @@
 - 章节缓存损坏时 get_article() 返回 None（视为未下载，自动重取），避免整本卡死；
   get_done_urls 同样把「存在但不可解析」的正文排除在完成集合之外（R1-m1），
   续传遇到坏缓存走正常重取管线，而不是导出阶段才炸、把用户逼上 --no-resume；
+  空壳正文（只有图片、没有任何文字，来自登录/验证闸门页）也一律不算完成，
+  否则重新登录后重跑只会把空白书重新导出一次（详见 get_done_urls 的说明）；
 - 下载成功后断点**保留**（R1-M4 主审裁决：秒级重导出/追更只抓新章），显式清理
   入口是 prune()（书架移除）与 fetcher 的 resume=False。
 """
@@ -259,17 +261,28 @@ class CheckpointStore:
             return None
 
     def get_done_urls(self) -> set[str]:
-        """返回状态中记录的已完成章节 URL 集合（仅统计正文存在且可解析的）。
+        """返回状态中记录的已完成章节 URL 集合（仅统计正文存在、可解析且有文字）。
 
         R1-m1：「完成」的标准从「文件存在」升级为「存在且可解析」——损坏缓存
         不再被当作已完成，否则续传会一路跳过、直到导出阶段才炸出 ParseError，
         把用户逼上 --no-resume 全量重下的死路（与「自愈重取」的承诺相反）。
         每个坏文件由 get_article 记 1 次 warning（不重复刷屏）。
+
+        本次再升级为「存在且**有正文**」（`Article.has_body_text`）：登录态失效
+        时知乎返回 HTTP 200 的登录/验证闸门页，解析出来是「只有几张 logo 图、
+        没有一个字」的空壳，旧口径照样认作完成——于是用户重新登录后重跑，
+        断点直接命中、只把空白书重新导出一次，永远好不了。空壳一律视为未完成，
+        续传时自动重取。
         """
         with self._lock:
             data = self.load()
         urls = {u for u in data.get("done_urls", []) if isinstance(u, str)}
-        return {u for u in urls if self.get_article(u) is not None}
+        return {u for u in urls if self._is_resumable(u)}
+
+    def _is_resumable(self, url: str) -> bool:
+        """该章缓存是否可复用：存在、可解析、且含可用正文（三者缺一即未完成）。"""
+        article = self.get_article(url)
+        return article is not None and article.has_body_text()
 
     # ------------------------------------------------------------------
     # 清理

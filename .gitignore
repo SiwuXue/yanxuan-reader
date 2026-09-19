@@ -23,3 +23,6 @@ Thumbs.db
 # 本地输出与内部工作件
 output/
 .LEAD_FINALIZE_NOTES.md
+
+# 本地助手工作区（工作日志含本机路径与登录态排障记录，不入公开仓库）
+.workbuddy/

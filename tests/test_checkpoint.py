@@ -155,6 +155,31 @@ def test_done_urls_ignores_entries_without_body(tmp_path: Path) -> None:
     assert store.get_done_urls() == set()
 
 
+def test_done_urls_ignores_image_only_shell_body(tmp_path: Path) -> None:
+    """闸门页存下的空壳正文（只有图片、没有一个字）不算完成 → 续传时自动重取。
+
+    回归 2026-09 的空白 epub 事故：登录态失效时知乎返回 HTTP 200 的登录/验证页，
+    解析出来就是「几张 logo 图」的空壳 Article。旧口径认作已完成，于是用户重新
+    登录后重跑只会命中缓存、把空白书重新导出一次，永远好不了。
+    """
+    store = CheckpointStore(tmp_path / "state", BOOK_KEY)
+    shell = Article(
+        title="知乎 - 有问题，就会有答案",
+        url=CH_URL,
+        chapter_type="normal",
+        blocks=[
+            Block(kind="img", src="https://static.zhihu.com/logo.png", alt="ZhiHu logo"),
+            Block(kind="img", src="https://pic.zhihu.com/logo2.png", alt="知乎 LOGO"),
+        ],
+    )
+    store.put_chapter(CH_URL, shell)
+
+    assert store.load()["done_urls"] == [CH_URL]   # 状态里确实记着完成
+    assert store.get_article(CH_URL) is not None   # 正文文件也在、也解析得动
+    assert shell.has_body_text() is False          # 只是它一个字都没有
+    assert store.get_done_urls() == set()          # 于是不算完成，续传会自动重取
+
+
 def test_get_article_corrupt_body_returns_none(tmp_path: Path) -> None:
     """正文缓存损坏 → None（视为未下载，自动重取而非整本失败）。"""
     store = CheckpointStore(tmp_path / "state", BOOK_KEY)

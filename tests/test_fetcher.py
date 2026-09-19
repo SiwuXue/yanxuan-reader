@@ -82,6 +82,7 @@ class Fakes:
         self.clean_calls: list[str] = []
         self.export_calls: list[dict[str, Any]] = []
         self.export_error: Exception | None = None
+        self.gate_pages: set[str] = set()
 
     # -- 装配 --------------------------------------------------------
     def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -90,6 +91,7 @@ class Fakes:
         parser.parse_article = self._parse_article          # type: ignore[attr-defined]
         parser.parse_toc = self._parse_toc                  # type: ignore[attr-defined]
         parser.parse_page_title = self._parse_page_title    # type: ignore[attr-defined]
+        parser.detect_gate_page = self._detect_gate_page    # type: ignore[attr-defined]
 
         urltype = types.ModuleType("zhihu_downloader.parse.urltype")
         urltype.detect = self._detect                       # type: ignore[attr-defined]
@@ -131,6 +133,15 @@ class Fakes:
         return "请提供知乎回答或盐选专栏链接后重试。"
 
     # -- parse.parser ------------------------------------------------
+    def _detect_gate_page(self, html: str, title: str = "") -> bool:
+        """默认都不是闸门页；把某段 HTML 放进 gate_pages 即视为登录/验证页。
+
+        真实实现在 parse/parser.py：按 /account/unhuman、站点默认标题、
+        「无 og:title 且无正文容器」三重判据识别，fetcher 只用它区分
+        「链接给错了」与「登录态掉了」两种目录报错。
+        """
+        return html in self.gate_pages
+
     def _parse_article(self, html: str, url: str = "") -> Article:
         delay = self.parse_delays.get(url, 0.0)
         if delay:
@@ -473,6 +484,24 @@ def test_resolve_book_empty_toc_raises_parse_error(fakes: Fakes) -> None:
     with pytest.raises(ParseError) as exc:
         resolve_book(make_client(session), COLUMN)
     assert "Cookie" in str(exc.value)
+
+
+def test_resolve_book_gate_page_toc_reports_login_not_bad_link(fakes: Fakes) -> None:
+    """目录页是登录/验证闸门页 → 提示重新登录，而不是让用户去排查链接。
+
+    登录态失效时知乎返回 HTTP 200 的登录/验证页，里面一个章节链接都没有；
+    笼统报「未解析到任何章节链接」会把用户引到错误的排查方向。
+    """
+    fakes.url_types[COLUMN] = "column"
+    fakes.toc = []
+    fakes.gate_pages.add("闸门页HTML")
+    session = FakeSession({COLUMN: FakeResponse(200, "闸门页HTML")})
+
+    with pytest.raises(ParseError) as exc:
+        resolve_book(make_client(session), COLUMN)
+    msg = str(exc.value)
+    assert "登录" in msg and "验证" in msg
+    assert "未在专栏页解析到任何章节链接" not in msg  # 不能是那条笼统消息
 
 
 def test_resolve_book_propagates_http_error(fakes: Fakes) -> None:

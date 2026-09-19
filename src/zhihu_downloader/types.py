@@ -75,6 +75,21 @@ class Article:
                 parts.append(b.text)
         return "\n\n".join(p for p in parts if p.strip())
 
+    def has_body_text(self) -> bool:
+        """是否含可用正文：至少一个非空文本块（img 块不算）。
+
+        这是「正文有效」的唯一定义，被两处共用：
+
+        - `parse.parser.parse_article`：解析结果只有图片时判为闸门页并报错，
+          不再把空白章节当成功；
+        - `engine.checkpoint.CheckpointStore.get_done_urls`：缓存里如果没有文字，
+          一律视为未完成、续传时自动重取。
+
+        登录态失效时知乎返回 HTTP 200 的登录/人机验证页（只有站点 logo 等几张图），
+        两个位置都必须能识别出这种空壳，否则会导出空白书且永远跳过、无法自愈。
+        """
+        return any(b.kind != "img" and (b.text or "").strip() for b in self.blocks)
+
 
 # ----------------------------------------------------------------------
 # 下载编排产物

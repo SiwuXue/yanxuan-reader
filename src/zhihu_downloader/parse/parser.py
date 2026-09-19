@@ -7,6 +7,10 @@
 - parse_toc：从专栏目录页提取章节链接 + 标题文本，返回 list[ChapterRef]。
 - parse_page_title：仅提取页面标题，找不到返回空串。
 
+闸门页防线（登录态失效时知乎返回 HTTP 200 而非 403，client 层看不出来）：
+- detect_gate_page：识别登录/人机验证页；
+- parse_article 拒绝「只有图片、没有任何文字」的结果，避免把空壳页存成章节。
+
 注意：本模块不做广告清洗（由 parse.cleaner 负责），保证解析层职责单一。
 """
 
@@ -22,7 +26,7 @@ from ..types import Article, Block, ChapterRef
 from .classifier import classify
 from .fontdecode import deobfuscate
 
-__all__ = ["parse_article", "parse_toc", "parse_page_title"]
+__all__ = ["detect_gate_page", "parse_article", "parse_toc", "parse_page_title"]
 
 #: 正文容器候选选择器（按优先级降级，同 v4 simple/parser.py）
 _CONTENT_SELECTORS: tuple[str, ...] = (
@@ -31,6 +35,28 @@ _CONTENT_SELECTORS: tuple[str, ...] = (
     "div.RichContent-inner",
     "article",
     "div.Post-RichText",
+)
+
+#: 知乎登录/人机验证闸门页的路径特征（出现在页面内嵌脚本的资源地址里）
+_GATE_URL_MARKER = "/account/unhuman"
+
+#: 闸门页/壳页的标题特征（站点默认标题与验证页标题，都不是正文页）
+_GATE_TITLE_MARKERS: tuple[str, ...] = ("安全验证", "有问题，就会有答案")
+
+#: 闸门页被当成正文时的报错。
+#: 断点里的空壳已由 CheckpointStore.get_done_urls 自动排除，无需让用户手动清缓存。
+_GATE_PAGE_MESSAGE = (
+    "该链接返回的是知乎登录/人机验证页，不是章节正文（页面里没有任何文字）。"
+    "常见原因：Cookie 已失效，或短时间内请求过多被风控。"
+    "请重新登录后用同一链接重新下载即可"
+    "（断点里若已存下空白章节，会被自动识别并重新抓取，不必手动清缓存）。"
+)
+
+#: 页面只有图片、连正文容器都没有时的报错
+_IMAGE_ONLY_MESSAGE = (
+    "未找到文章正文（页面只有图片，没有任何文字）。"
+    "可能原因：链接不是章节页、内容仅 APP 内可见，或 Cookie 已失效——"
+    "请检查链接类型或重新登录后重试。"
 )
 
 #: 参与结构化提取的正文标签
@@ -140,6 +166,62 @@ def _extract_blocks(container: Tag) -> list[Block]:
     return blocks
 
 
+def _find_content_container(soup: BeautifulSoup) -> Tag | None:
+    """按降级链定位正文容器；全部未命中返回 None（调用方自行决定兜底）。"""
+    for selector in _CONTENT_SELECTORS:
+        found = soup.select_one(selector)
+        if found is not None:
+            return found
+    return None
+
+
+def _has_og_title(soup: BeautifulSoup) -> bool:
+    """页面是否带非空 og:title（章节页有，登录/验证闸门页没有）。"""
+    node = soup.find("meta", attrs={"property": "og:title"})
+    return node is not None and bool(_attr_str(node, "content"))
+
+
+def _gate_by_soup(soup: BeautifulSoup, title: str = "") -> bool:
+    """闸门页判定核心（页面已解析成 soup，标题可外部传入以免重复提取）。"""
+    if not title:
+        try:
+            title = _extract_title(soup)
+        except ParseError:
+            title = ""
+    if any(marker in title for marker in _GATE_TITLE_MARKERS):
+        return True
+    if _has_og_title(soup):
+        return False
+    # 既无 og:title 又匹配不到任何正文容器 —— 真正的章节页两者必居其一。
+    return _find_content_container(soup) is None
+
+
+def detect_gate_page(html: str, title: str = "") -> bool:
+    """页面是否为知乎的登录 / 人机验证闸门页（而非正文页）。
+
+    登录态失效或触发风控时，知乎会返回 **HTTP 200 的闸门页**而不是 403，
+    所以 client 层只看状态码是看不出来的，必须在解析层识别。判据取并集：
+
+    1. 页面里出现 ``/account/unhuman``（人机验证页的跳转资源）；
+    2. 标题命中站点默认/验证类标题（如「知乎 - 有问题，就会有答案」
+       「安全验证 - 知乎」）；
+    3. 既没有 og:title、也匹配不到任何正文容器。
+
+    目录页（`parse_toc` 解不出章节）也用它区分「链接给错了」与「登录态掉了」，
+    两者的报错建议完全不同。
+
+    Args:
+        html: 页面 HTML。
+        title: 已提取到的标题（可选；为空时自行从页面取）。
+
+    Returns:
+        True 表示是闸门页。
+    """
+    if _GATE_URL_MARKER in html:
+        return True
+    return _gate_by_soup(_soup(deobfuscate(html)), title)
+
+
 def parse_article(html: str, url: str = "") -> Article:
     """解析单章页面为 Article（结构化 blocks + 分类器给出的 chapter_type）。
 
@@ -148,18 +230,15 @@ def parse_article(html: str, url: str = "") -> Article:
         url: 该章节的来源 URL（原样写入 Article.url）。
 
     Raises:
-        ParseError: 找不到标题或正文（中文消息含下一步建议）。
+        ParseError: 找不到标题、正文为空，或页面是登录/验证闸门页
+            （解析结果只有图片），中文消息含下一步建议。
     """
     html = deobfuscate(html)  # 先还原知乎盐选字体反爬乱码，再进解析
     soup = _soup(html)
     title = _extract_title(soup)
 
-    container: Tag | None = None
-    for selector in _CONTENT_SELECTORS:
-        found = soup.select_one(selector)
-        if found is not None:
-            container = found
-            break
+    container = _find_content_container(soup)
+    content_found = container is not None
     if container is None:
         container = soup.body if soup.body is not None else soup
     for noise in container.find_all(list(_NOISE_TAGS)):
@@ -178,7 +257,16 @@ def parse_article(html: str, url: str = "") -> Article:
             "请检查链接类型或重新登录后重试。"
         )
 
-    return Article(title=title, url=url, blocks=blocks, chapter_type=classify(title))
+    article = Article(title=title, url=url, blocks=blocks, chapter_type=classify(title))
+    if not content_found and not article.has_body_text():
+        # 只在「连正文容器都没找到」时判负：真·图片类章节（如漫画）通常有
+        # div.RichText，不应被误杀；而闸门页两者都没有。
+        # 旧实现会把这 4 张 logo 图当成正文存进断点，导出成空白书且永不重取。
+        if _GATE_URL_MARKER in html or _gate_by_soup(soup, title):
+            raise ParseError(_GATE_PAGE_MESSAGE)
+        raise ParseError(_IMAGE_ONLY_MESSAGE)
+
+    return article
 
 
 def _link_title(node: Tag) -> str:

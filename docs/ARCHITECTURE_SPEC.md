@@ -67,6 +67,10 @@ class CheckpointStore:
     def put_chapter(self, url: str, article: Article) -> None
     # 章节正文存 state_dir/chapters/<sha1(url)[:16]>.json（Article.to_dict()）
     def get_done_urls(self) -> set[str]
+    # ⚠️「完成」判据 = 缓存存在 + 可解析 + Article.has_body_text()（三者缺一即未完成，下次重取）
+    #    has_body_text = 至少一个非空文本块（img 不算）。登录态失效时知乎返回 HTTP 200 的
+    #    登录/验证闸门页，解析出来只有几张 logo 图 → 旧判据会把它当完成，导致用户重新登录后
+    #    重跑仍命中断点、只把空白书重新导出一次。闸门页防线见 §2.9（2026-09 加固）。
     def get_article(self, url: str) -> Article | None
     def set_meta(self, title: str, total: int, fmt: str) -> None
     def clear(self) -> None  # 删状态与章节缓存（--no-resume 前置清理 / prune 内部复用）
@@ -81,6 +85,8 @@ def resolve_book(client: ZhihuClient, url: str) -> BookMeta
 #    - app_only → raise UnsupportedUrlError(含 story→market 替换建议)
 #    - section → fetch 该页，parse.parser.parse_article → BookMeta(title=章标题, chapters=[1 章])
 #    - column  → fetch 目录页，parse.parser.parse_toc → BookMeta(title, chapters=[...])
+#      parse_toc 返回 [] 时由 fetcher 报错：先用 parse.parser.detect_gate_page 区分
+#      「登录/验证闸门页」与「链接给错了」，两种建议完全不同（2026-09 加固，见 §2.9.1）
 #    - unknown → raise UnsupportedUrlError
 def download_book(client, url, fmt="md", output_dir=".",
                   progress: Callable[[ProgressEvent], None] | None = None,
@@ -137,9 +143,37 @@ def parse_article(html: str, url: str = "") -> Article
 # 选择器降级链同 v4（RichText/Post-RichTextContainer/RichContent-inner/article/Post-RichText）
 # 遍历容器内 p/h2/h3/li/blockquote/img → Block 列表（img 保留 src/alt；懒加载 data-original 优先）
 # 标题：og:title > h1.Post-Title > h1 > title；找不到 raise ParseError
+# 闸门页防线（2026-09 加固）：仅在「正文容器也没找到」且 Article.has_body_text() 为 False 时
+#   raise ParseError（消息区分「登录/验证闸门页」与「只有图片」两种）。
+#   只在无容器时判负是刻意的——真·图片类章节（漫画）有 div.RichText，不能误杀。
+def detect_gate_page(html: str, title: str = "") -> bool
+# 判据取并集：① 页面含 /account/unhuman；② 标题命中「安全验证」/「有问题，就会有答案」；
+#   ③ 无 og:title 且匹配不到任何正文容器。
 def parse_toc(html: str, base_url: str) -> list[ChapterRef]  # v4 parse_section_links 升级：同时抓标题文本
 def parse_page_title(html: str) -> str
 ```
+#### §2.9.1 为什么必须有 detect_gate_page（GT#1 生产故障，2026-09）
+
+登录态失效或触发风控时，知乎返回的是 **HTTP 200 的登录/人机验证页，而不是 403** ——
+`engine/client.py` 只看状态码，看不出来。该页特征：`<title>` 是站点默认
+「知乎 - 有问题，就会有答案」、页面上只有几张 logo 图
+（`wechat-share-logo`、`知乎 LOGO`、`本站提供适老化无障碍服务`）、**无 `div.RichText`、无 `og:title`**。
+
+旧 `parse_article` 在容器全未命中时回落 `soup.body`，只要有 `<img>` 就算 blocks 非空 →
+**把这 4 张 logo 图当成正文**，静默导出空白书；`checkpoint` 又把它记成「本章已完成」，
+于是重新登录后重跑只会命中缓存、把空白书重新导出一次，**永远好不了**。
+用户会误判为「知乎加强反爬」，实际是解析层没兜住。
+
+配套防线（三层，缺一不可）：
+1. `types.Article.has_body_text()` —— 「正文有效」唯一定义，解析层与断点层共用；
+2. `parse_article` 判负 + `detect_gate_page` 给出可操作报错；
+3. `CheckpointStore.get_done_urls()` 经 `_is_resumable()` 校验正文有效性与
+   `fetcher._collect_articles()` 的 `usable()` —— 空壳视为未完成，**自动重取（自愈）**，
+   用户无需手动 `--no-resume`。
+
+知乎反爬现状实测（2026-09）：匿名/坏指纹 → 403 + 694B JS 挑战页（`zh-zse-ck`）；
+缺 `z_c0` → 302 `/account/unhuman?need_login=true`；不存在章节 → 200「内容异常」；
+不存在专栏 → 400「发生错误」。
 ### 2.10 parse/cleaner.py —— 移植旧版 ContentCleaner（广告/水印正则表，可传自定义 patterns）
 ```python
 def clean(article: Article, extra_patterns: list[str] | None = None) -> Article  # 就地过滤 Block
@@ -263,6 +297,9 @@ E1-E5 并行（互不 import 对方新代码，只依赖 types/errors/signature 
 | E3#2 parse_toc 空目录返回 []，抛错权在 resolve_book | ✅ 批准（E1 已按此实现） | fetcher |
 | E3#4 cleaner 整块过滤、不移植 <3 字短行规则 | ✅ 批准（防误杀「好。」类合法段落，v4 审计痛点） | cleaner |
 | E5#1 record_download 扩展 chapter_urls 参数 | ✅ 批准（已写入 §2.13 调用方约定） | shelf |
+| GT#1 登录态失效时知乎返回 **HTTP 200 闸门页**（非 403），被当成正文导出空白书且断点永久污染 | ✅ 已修：三层防线（`has_body_text` / `detect_gate_page`+`parse_article` 判负 / `get_done_urls`+`_collect_articles` 空壳自动重取），详见 §2.9.1；15 条新测试 | parse/checkpoint/fetcher |
+| GT#2 判负边界：只在「正文容器也没找到」时才判负 | ✅ 刻意设计——真·图片类章节（漫画）有 `div.RichText`，不得误杀；有反向测试钉住 | parse |
+| GT#3 盐选字体字形名随机化前，`deobfuscate` 的 OCR 回退是**必需**的；缺 Pillow/ddddocr 时正文会「像中文但读不通」 | ✅ 记录：发布包内嵌 OCR 模型故用户无感；源码跑测试须装 fontTools/Pillow/ddddocr | fontdecode |
 | E1 修复：TOC 标题权威覆盖 og:title；UnsupportedUrlError 嵌具体替换 URL | ✅ 验收测试 test_e2e 6/6 绿 | fetcher |
 | P1：editable 失败退回 PYTHONPATH=src 防假绿 | ✅ 批准 | ci.yml |
 | E1#1-9 全部批准：单篇特判/on_retry 钩子/copy_with 超集/单章 1 请求/TOC 权威/market_replacement 暂居 fetcher/CheckpointError 映射下发 I1、I3/并发语义钉死（吞吐=限速，禁宣提速）/e2e cwd 泄漏主审已修 | ✅ | engine |
