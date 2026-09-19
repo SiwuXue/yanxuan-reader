@@ -6,26 +6,26 @@
 
 ## 下载与启动
 
-当前发布版本：**v5.0.1**。发布包包含 Python 运行环境、Web 界面和字体 OCR 模型，无需另行安装 Python。
+当前发布版本：**v5.0.2**。发布包包含 Python 运行环境、Web 界面和字体 OCR 模型，无需另行安装 Python。
 
 | 平台 | 下载 |
 | --- | --- |
-| Windows x64 | [zhihu-downloader-5.0.1-windows-x64.exe](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.1/zhihu-downloader-5.0.1-windows-x64.exe) |
-| macOS Apple Silicon（M 系列） | [zhihu-downloader-5.0.1-macos-arm64](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.1/zhihu-downloader-5.0.1-macos-arm64) |
-| Linux x64 | [zhihu-downloader-5.0.1-linux-x64](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.1/zhihu-downloader-5.0.1-linux-x64) |
+| Windows x64 | [zhihu-downloader-5.0.2-windows-x64.exe](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.2/zhihu-downloader-5.0.2-windows-x64.exe) |
+| macOS Apple Silicon（M 系列） | [zhihu-downloader-5.0.2-macos-arm64](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.2/zhihu-downloader-5.0.2-macos-arm64) |
+| Linux x64 | [zhihu-downloader-5.0.2-linux-x64](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.2/zhihu-downloader-5.0.2-linux-x64) |
 
 Windows 下载 `.exe` 后双击启动。程序会打开浏览器，默认地址为 `http://127.0.0.1:3000/`；端口被占用时会尝试后续端口，以启动日志显示的地址为准。使用期间保持程序运行，关闭浏览器标签不会停止后台服务。
 
 macOS 和 Linux 在下载目录打开终端，赋予执行权限后启动。例如 Linux：
 
 ```bash
-chmod +x zhihu-downloader-5.0.1-linux-x64
-./zhihu-downloader-5.0.1-linux-x64
+chmod +x zhihu-downloader-5.0.2-linux-x64
+./zhihu-downloader-5.0.2-linux-x64
 ```
 
-macOS 将文件名换成 `zhihu-downloader-5.0.1-macos-arm64`。当前未提供 Intel Mac 预构建包，可使用下方的源码运行方式。Linux 发布包在 Ubuntu 22.04 上构建。
+macOS 将文件名换成 `zhihu-downloader-5.0.2-macos-arm64`。当前未提供 Intel Mac 预构建包，可使用下方的源码运行方式。Linux 发布包在 Ubuntu 22.04 上构建。
 
-发布包暂未代码签名；系统可能显示来源或签名提示。文件完整性可对照 Release 附件 [SHA256SUMS.txt](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.1/SHA256SUMS.txt) 检查。
+发布包暂未代码签名；系统可能显示来源或签名提示。文件完整性可对照 Release 附件 [SHA256SUMS.txt](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.2/SHA256SUMS.txt) 检查。
 
 ## 三步开始使用
 
