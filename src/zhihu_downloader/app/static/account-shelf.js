@@ -11,6 +11,14 @@
     var statuses = { queued: '等待提交', submitted: '下载中', done: '已完成', error: '失败', skipped: '已跳过重复任务' };
     function el(id) { return doc.querySelector('#account-' + id); }
     function esc(s) { return opts.escapeHtml(s); }
+    function kindLabel(kind, supported) {
+      var labels = {
+        short_story: '盐选短故事', work: '盐选短故事', live: 'Live 音视频',
+        paid_column: '盐选专栏', column: '知乎专栏', answer: '知乎回答', article: '知乎文章'
+      };
+      var key = String(kind || '').toLowerCase().replace(/[\s-]+/g, '_');
+      return labels[key] || (supported ? '可下载藏书' : '账号藏书');
+    }
     function message(text, bad) {
       el('message').textContent = text;
       el('message').className = 'form-msg' + (bad ? ' form-msg-bad' : '');
@@ -27,8 +35,16 @@
       el('refresh').textContent = loading ? '读取中…' : (loaded ? '刷新书架' : '读取书架');
       el('count').textContent = loaded ? '已加载 ' + books.length + ' / ' + total + ' 条 · 可下载 ' +
         books.filter(function (b) { return b.supported; }).length + ' 条' : '';
+      var navCount = doc.querySelector('#nav-account-count');
+      if (navCount) { navCount.textContent = loaded ? String(total) : '—'; }
       el('download').disabled = selected.size === 0;
       el('download').textContent = '下载所选' + (selected.size ? '（' + selected.size + '）' : '');
+      var selectionCount = doc.querySelector('#account-selection-count');
+      if (selectionCount) {
+        selectionCount.textContent = selected.size ? selected.size + ' 本书已选中' :
+          '选择书籍后，可以批量保存到本机';
+      }
+      doc.body.classList.toggle('has-account-selection', selected.size > 0);
       el('select-all').disabled = !available.length;
       var checked = available.filter(function (b) { return selected.has(b.id); }).length;
       el('select-all').checked = available.length > 0 && checked === available.length;
@@ -39,12 +55,16 @@
         var job = jobs.get(b.id);
         var locked = !b.supported || busy(job);
         var action = job && job.status === 'error' ? '重试' : (job && job.status === 'done' ? '再次下载' : '下载');
-        return '<li class="shelf-item"><div class="account-book-head"><label><input class="account-book-select" ' +
-          'type="checkbox" data-account-select="' + esc(b.id) + '"' + (locked ? ' disabled' : '') +
-          (selected.has(b.id) ? ' checked' : '') + ' /><span class="shelf-title">' + esc(b.title) +
-          '</span></label>' + (b.supported ? '<button class="btn btn-outline btn-sm" type="button" data-account-download="' +
+        return '<li class="shelf-item' + (selected.has(b.id) ? ' is-selected' : '') + '"><div class="account-cover-stage">' +
+          '<div class="account-cover" aria-hidden="true"><small>YANXUAN · MY LIBRARY</small><span class="account-cover-title">' +
+          esc(b.title) + '</span><span class="account-cover-foot">' + esc(kindLabel(b.kind, b.supported)) +
+          '</span></div></div><div class="account-book-info"><div class="account-book-head">' +
+          '<label><input class="account-book-select" type="checkbox" data-account-select="' + esc(b.id) + '"' +
+          (locked ? ' disabled' : '') + (selected.has(b.id) ? ' checked' : '') + ' /><span class="shelf-title">' +
+          esc(b.title) + '</span></label>' + (b.supported ? '<button class="btn btn-outline btn-sm" type="button" data-account-download="' +
           esc(b.id) + '"' + (locked ? ' disabled' : '') + '>' + action + '</button>' : '') + '</div>' +
-          '<p class="account-book-reason">' + esc(b.supported ? '支持网页下载' : b.unsupported_reason) + '</p></li>';
+          '<p class="account-book-reason' + (b.supported ? '' : ' is-unsupported') + '">' +
+          esc(b.supported ? '支持网页下载' : b.unsupported_reason) + '</p></div></li>';
       }).join('');
       if (loaded && !list.length) {
         el('list').innerHTML = '<li class="empty">' + (books.length ? '已加载书目中没有匹配结果。' : '当前账号书架为空。') + '</li>';
@@ -178,6 +198,10 @@
         if (!id) { return; }
         if (event.target.checked) { selected.add(id); } else { selected.delete(id); }
         render();
+        var restored = Array.prototype.find.call(el('list').querySelectorAll('[data-account-select]'), function (input) {
+          return input.getAttribute('data-account-select') === id;
+        });
+        if (restored) { restored.focus(); }
       });
       el('list').addEventListener('click', function (event) {
         var id = event.target.getAttribute('data-account-download');

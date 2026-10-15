@@ -10,59 +10,66 @@
 <body>
   <a class="skip-link" href="#main">跳到主要内容</a>
 
-  <!-- ============ 顶栏 ============ -->
+  <!-- 桌面侧栏与顶部工具栏 -->
+  <aside class="sidebar" aria-label="主导航">
+    <a class="brand" href="#account" data-page-nav="account" aria-label="盐选书房首页">
+      <span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 5.2c3.2-.9 6-.4 8.5 1.5 2.5-1.9 5.3-2.4 8.5-1.5v14c-3.2-.9-6-.4-8.5 1.5-2.5-1.9-5.3-2.4-8.5-1.5z"/><path d="M12 6.7v14"/></svg></span>
+      <span class="brand-text"><strong class="brand-name">盐选书房</strong><span class="brand-sub">YANXUAN READER</span></span>
+    </a>
+    <p class="sidebar-caption">我的书房</p>
+    <nav class="side-nav" aria-label="书房页面">
+      <a href="#account" data-page-nav="account" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 5v14m4-14v14m4-14v14m4-12 4 12M3 20h18"/></svg><span>账号书架</span><span id="nav-account-count" class="nav-count">—</span></a>
+      <a href="#local" data-page-nav="local"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 12h16M8 6v6m4-6v6m4-6v6m-8 4v5m5-5v5"/></svg><span>本地书架</span><span id="nav-local-count" class="nav-count"></span></a>
+      <a href="#download" data-page-nav="download"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg><span>链接下载</span></a>
+      <a href="#tasks" data-page-nav="tasks"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zm0 8h6m-6 4h4"/></svg><span>下载任务</span><span id="nav-tasks-count" class="nav-count"></span></a>
+    </nav>
+    <div class="sidebar-note"><svg viewBox="0 0 130 70" aria-hidden="true"><path d="M7 60h116M16 58V22h13v36m4 0V13h13v45m5 0V27h12v31m6-1 9-34 12 3-9 34M93 58V39h18v19"/><path d="M18 27h8M36 19h7M36 23h7M54 32h6M96 44h12M103 32c-4-10-1-20 11-25 0 11-4 18-11 25z"/></svg><p>把喜欢的故事，<br>留在自己的书房。</p><small>EPUB / TXT / Markdown</small></div>
+    <a class="settings-link" href="#settings" data-page-nav="settings"><svg viewBox="0 0 24 24"><path d="M12 3l2 3 3-.2.5 3.1L20 11l-2.5 2.1L17 17l-3-.2-2 3-2-3-3 .2-.5-3.9L4 11l2.5-2.1L7 5.8l3 .2z"/><circle cx="12" cy="11" r="3"/></svg><span>设置与关于</span></a>
+    <div class="sidebar-foot"><span>PRIVATE &amp; LOCAL</span><span aria-hidden="true">✦</span></div>
+  </aside>
+
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="brand">
-        <span class="brand-logo" aria-hidden="true">盐</span>
-        <span class="brand-text">
-          <strong class="brand-name">盐选书房</strong>
-          <span class="brand-sub">小说 → 墨水屏 · 个人备份</span>
-        </span>
-      </div>
-
+      <a class="mobile-brand" href="#account" data-page-nav="account"><span class="brand-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 5.2c3.2-.9 6-.4 8.5 1.5 2.5-1.9 5.3-2.4 8.5-1.5v14c-3.2-.9-6-.4-8.5 1.5-2.5-1.9-5.3-2.4-8.5-1.5z"/><path d="M12 6.7v14"/></svg></span>盐选书房</a>
+      <div class="breadcrumb"><svg viewBox="0 0 24 24"><path d="M3.5 5.2c3.2-.9 6-.4 8.5 1.5 2.5-1.9 5.3-2.4 8.5-1.5v14c-3.2-.9-6-.4-8.5 1.5-2.5-1.9-5.3-2.4-8.5-1.5z"/><path d="M12 6.7v14"/></svg><span>我的书房</span><span aria-hidden="true">/</span><b id="page-label">账号书架</b></div>
       <div class="topbar-status">
-        <button id="cookie-pill" class="status-pill status-unknown" type="button"
-                aria-describedby="cookie-pill-help">
-          <span class="pill-dot" aria-hidden="true"></span>
-          <span id="cookie-pill-text">正在检查登录状态…</span>
-        </button>
+        <button id="cookie-pill" class="status-pill status-unknown" type="button" aria-describedby="cookie-pill-help"><span class="pill-dot" aria-hidden="true"></span><span id="cookie-pill-text">正在检查登录状态…</span></button>
         <span id="cookie-pill-help" class="visually-hidden">点击这里查看登录详情或手动导入 Cookie。</span>
-        <!-- 折叠按钮必须留在菜单外面，否则窄屏下会被一起藏掉，菜单就打不开了 -->
-        <button id="nav-toggle" class="btn btn-icon nav-toggle" type="button"
-                aria-label="展开或收起顶部按钮" aria-expanded="false" aria-controls="topbar-actions">≡</button>
       </div>
-
       <div class="topbar-actions" id="topbar-actions">
         <button id="qr-btn" class="btn btn-primary" type="button">扫码登录</button>
-        <button id="settings-btn" class="btn btn-icon" type="button"
-                aria-label="打开设置" aria-expanded="false" aria-controls="settings-drawer">⚙</button>
-        <button id="theme-toggle" class="btn btn-icon" type="button"
-                aria-label="切换深色或浅色主题" aria-pressed="false">☾</button>
+        <button id="settings-btn" class="btn btn-icon" type="button" aria-label="打开账号设置" aria-expanded="false" aria-controls="settings-drawer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2 3 3-.2.5 3.1L20 11l-2.5 2.1L17 17l-3-.2-2 3-2-3-3 .2-.5-3.9L4 11l2.5-2.1L7 5.8l3 .2z"/><circle cx="12" cy="11" r="3"/></svg></button>
+        <button id="theme-toggle" class="btn btn-icon" type="button" aria-label="切换深色或浅色主题" aria-pressed="false">☾</button>
       </div>
     </div>
   </header>
 
   <!-- ============ 主体 ============ -->
   <main id="main" class="container" tabindex="-1">
-    <div class="grid">
-      <!-- 左栏：下载 + 进度 -->
-      <div class="col">
+      <section class="app-page page-account" id="page-account" data-page-panel="account">
+        <div class="page-heading"><div><p class="eyebrow">ACCOUNT LIBRARY</p><h1 id="account-page-title">账号书架</h1><p class="page-subtitle">好故事不必四处寻找，你的书架就在这里。</p></div><span class="page-note">你的知乎收藏 · 仅本机可见</span></div>
         <section class="card" aria-labelledby="account-title">
           <div class="card-head">
-            <h2 id="account-title" class="card-title">账号书架</h2>
+            <div><p class="card-kicker">ACCOUNT LIBRARY</p><h2 id="account-title" class="card-title">账号藏书</h2></div>
             <button id="account-refresh" class="btn btn-outline btn-sm" type="button">读取书架</button>
           </div>
           <p class="muted card-desc">读取当前知乎账号的书架，直接选书下载。仅支持提供可用网页版链接的条目。</p>
           <label class="field-label" for="account-search">搜索已加载书目</label>
           <input id="account-search" type="search" placeholder="输入书名" autocomplete="off" />
           <p id="account-count" class="field-help"></p>
-          <div class="account-toolbar">
-            <label><input id="account-select-all" type="checkbox" /> 全选当前结果中可下载的书</label>
+          <div class="account-toolbar" id="account-selection-bar">
+            <label><input id="account-select-all" type="checkbox" /> 全选可下载</label>
+            <span id="account-selection-count" class="selection-count">选择书籍后，可以批量保存到本机</span>
+            <div class="account-format" role="group" aria-label="批量导出格式">
+              <span class="account-format-label">导出为</span>
+              <button class="format-chip" type="button" data-account-format="epub" aria-pressed="true">EPUB</button>
+              <button class="format-chip" type="button" data-account-format="txt" aria-pressed="false">TXT</button>
+              <button class="format-chip" type="button" data-account-format="md" aria-pressed="false">MD</button>
+            </div>
             <button id="account-download" class="btn btn-primary btn-sm" type="button" disabled>下载所选</button>
           </div>
-          <p class="field-help">使用下方的导出格式、限速和断点续传设置。</p>
-          <p id="account-message" class="form-msg" role="status" aria-live="polite">登录后点「读取书架」，无需逐本复制链接。</p>
+          <p class="field-help">批量下载会沿用链接下载页的限速与断点续传设置。</p>
+          <p id="account-message" class="form-msg" role="status" aria-live="polite">点「读取书架」同步当前账号的藏书，加载后即可搜索和选择。</p>
           <ul id="account-list" class="shelf account-list" aria-label="账号书架条目"></ul>
           <button id="account-more" class="btn btn-outline btn-block" type="button" hidden>加载更多</button>
           <div id="account-queue-box" class="account-queue" hidden>
@@ -71,9 +78,12 @@
             <ul id="account-queue" aria-live="polite"></ul>
           </div>
         </section>
+      </section>
 
+      <section class="app-page page-download" id="page-download" data-page-panel="download" hidden>
+        <div class="page-heading"><div><p class="eyebrow">SAVE A GOOD STORY</p><h1>链接下载</h1><p class="page-subtitle">给好故事一个离线的位置，一条链接就够了。</p></div></div>
         <section class="card" aria-labelledby="download-title">
-          <h2 id="download-title" class="card-title">下载一本盐选小说</h2>
+          <div class="card-head"><div><p class="card-kicker">01 / NEW DOWNLOAD</p><h2 id="download-title" class="card-title">从链接开始</h2></div></div>
           <p class="muted card-desc">
             在知乎 App 或网页版打开盐选专栏，点「分享 → 复制链接」，粘贴到这里即可。
           </p>
@@ -123,65 +133,61 @@
           </form>
         </section>
 
+      </section>
+
+      <section class="app-page page-tasks" id="page-tasks" data-page-panel="tasks" hidden>
+        <div class="page-heading"><div><p class="eyebrow">YOUR DOWNLOADS</p><h1>下载任务</h1><p class="page-subtitle">故事正在路上，等它们慢慢抵达。</p></div><button class="btn btn-outline" type="button" data-page-nav="download">新建下载</button></div>
+        <section class="card" aria-labelledby="tasks-title">
+          <div class="card-head">
+            <div><p class="card-kicker">DOWNLOAD QUEUE</p><h2 id="tasks-title" class="card-title">任务进度</h2></div>
+            <span id="tasks-count" class="muted small"></span>
+          </div>
+          <p id="tasks-empty" class="empty">还没有任务。创建下载后，任务进度与完成文件会显示在这里。</p>
+          <ul id="tasks-list" class="tasks"></ul>
+        </section>
         <section id="progress-card" class="card progress-card" aria-labelledby="progress-title" hidden>
           <div class="card-head">
             <h2 id="progress-title" class="card-title">下载进度</h2>
             <span id="prog-task" class="mono muted small"></span>
           </div>
-
           <p id="prog-book" class="prog-book">准备中…</p>
-
-          <div id="prog-bar" class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
-               aria-labelledby="progress-title">
+          <div id="prog-bar" class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="progress-title">
             <div id="prog-fill" class="bar-fill"></div>
           </div>
-
           <div class="prog-meta">
             <span id="prog-count" class="mono">0 / 0</span>
             <span id="prog-pct" class="mono prog-pct">0%</span>
             <span id="prog-conn" class="conn-badge"></span>
           </div>
-
           <p id="prog-chapter" class="prog-chapter" aria-live="polite">正在连接进度通道…</p>
-
-          <!-- retry 事件的黄色行内提示：重试不算失败，成功后自动消失 -->
           <p id="prog-retry-hint" class="retry-hint" role="status" hidden></p>
-
           <ul id="prog-log" class="prog-log" aria-live="polite"></ul>
-
           <div id="prog-files" class="file-links"></div>
-
           <div class="prog-actions">
             <button id="prog-retry" class="btn btn-outline" type="button" hidden>重试下载</button>
             <button id="prog-close" class="btn btn-ghost" type="button">收起进度</button>
           </div>
         </section>
-      </div>
+      </section>
 
-      <!-- 右栏：任务 + 书架 -->
-      <div class="col">
-        <section class="card" aria-labelledby="tasks-title">
-          <div class="card-head">
-            <h2 id="tasks-title" class="card-title">下载任务</h2>
-            <span id="tasks-count" class="muted small"></span>
-          </div>
-          <p id="tasks-empty" class="empty">还没有任务。在左边粘贴一个知乎链接，点「开始下载」，这里会实时显示进度。</p>
-          <ul id="tasks-list" class="tasks"></ul>
-        </section>
-
+      <section class="app-page page-local" id="page-local" data-page-panel="local" hidden>
+        <div class="page-heading"><div><p class="eyebrow">LOCAL COLLECTION</p><h1>本地书架</h1><p class="page-subtitle">把喜欢的故事，留在触手可及的地方。</p></div><button class="btn btn-primary" type="button" data-page-nav="download">添加下载</button></div>
         <section class="card" aria-labelledby="shelf-title">
           <div class="card-head">
-            <h2 id="shelf-title" class="card-title">本地书架</h2>
+            <div><p class="card-kicker">SAVED STORIES</p><h2 id="shelf-title" class="card-title">我的藏书</h2></div>
             <span id="shelf-count" class="muted small"></span>
           </div>
           <p id="shelf-empty" class="empty">书架还空着。下载成功后这本书会自动放进来，以后点「检查更新」就能追更新章节。</p>
           <ul id="shelf-list" class="shelf"></ul>
         </section>
+      </section>
 
-        <!-- 关于：放主页面右栏，比藏在设置抽屉里更醒目 -->
+      <section class="app-page page-settings" id="page-settings" data-page-panel="settings" hidden>
+        <div class="page-heading"><div><p class="eyebrow">MAKE YOURSELF AT HOME</p><h1>设置与关于</h1><p class="page-subtitle">一点小小的调整，让书房更合心意。</p></div></div>
+        <section class="card settings-summary"><p class="card-kicker">ACCOUNT &amp; APPEARANCE</p><h2 class="card-title">书房偏好</h2><p class="muted">查看登录状态、管理 Cookie，或切换浅色与深色主题。</p><button class="btn btn-primary" type="button" data-open-settings>账号与登录设置</button><p class="settings-summary-note">登录凭证只保存在这台设备上。</p></section>
         <section class="card about-card" aria-labelledby="about-title">
           <div class="card-head">
-            <h2 id="about-title" class="card-title">关于</h2>
+            <div><p class="card-kicker">THE PROJECT</p><h2 id="about-title" class="card-title">关于盐选书房</h2></div>
             <span class="muted small">版本 <span id="app-version" class="mono">读取中…</span></span>
           </div>
           <p class="about-intro">
@@ -214,13 +220,17 @@
           </ul>
           <p class="field-help about-foot-note">链接会在浏览器新标签页打开。下载的文件保存在这台电脑的 <code>~/.zhihu_downloader/output</code> 目录。</p>
         </section>
-      </div>
-    </div>
-
-    <footer class="foot">
-      <p class="muted small">本工具只用于把你已购买的内容备份到自己的设备，数据不离开这台电脑。</p>
-    </footer>
+      </section>
+    <footer class="foot"><p class="muted small">本工具只用于把你有权阅读的内容备份到自己的设备，数据不离开这台电脑。</p></footer>
   </main>
+
+  <nav class="mobile-nav" aria-label="手机主导航">
+    <a href="#account" data-page-nav="account" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 5v14m4-14v14m4-14v14m4-12 4 12M3 20h18"/></svg><span>账号书架</span></a>
+    <a href="#local" data-page-nav="local"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 12h16m-12-6v6m4-6v6m4-6v6"/></svg><span>本地书架</span></a>
+    <a href="#download" data-page-nav="download"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg><span>链接下载</span></a>
+    <a href="#tasks" data-page-nav="tasks"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zm0 8h6m-6 4h4"/></svg><span>下载任务</span><span id="mobile-tasks-count" class="mobile-nav-count"></span></a>
+    <a href="#settings" data-page-nav="settings"><svg viewBox="0 0 24 24"><path d="M12 3l2 3 3-.2.5 3.1L20 11l-2.5 2.1L17 17l-3-.2-2 3-2-3-3 .2-.5-3.9L4 11l2.5-2.1L7 5.8l3 .2z"/><circle cx="12" cy="11" r="3"/></svg><span>设置</span></a>
+  </nav>
 
   <!-- ============ 扫码登录模态 ============ -->
   <div id="qr-modal" class="overlay" hidden>

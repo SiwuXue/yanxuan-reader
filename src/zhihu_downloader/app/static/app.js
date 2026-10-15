@@ -779,6 +779,68 @@
   }
 
   var BASE_TITLE = document.title;
+  var PAGE_LABELS = {
+    account: '账号书架',
+    local: '本地书架',
+    download: '链接下载',
+    tasks: '下载任务',
+    settings: '设置与关于'
+  };
+
+  function pageFromHash() {
+    var page = String(window.location.hash || '').replace(/^#/, '');
+    return PAGE_LABELS[page] ? page : 'account';
+  }
+
+  function applyPage(page) {
+    if (!PAGE_LABELS[page]) { page = 'account'; }
+    document.body.dataset.page = page;
+    $all('[data-page-panel]').forEach(function (panel) {
+      panel.hidden = panel.getAttribute('data-page-panel') !== page;
+    });
+    $all('[data-page-nav]').forEach(function (item) {
+      var active = item.getAttribute('data-page-nav') === page;
+      if (item.tagName === 'A') {
+        if (active) { item.setAttribute('aria-current', 'page'); }
+        else { item.removeAttribute('aria-current'); }
+      }
+    });
+    var label = $('#page-label');
+    if (label) { label.textContent = PAGE_LABELS[page]; }
+  }
+
+  function navigatePage(page) {
+    if (!PAGE_LABELS[page]) { return; }
+    if (window.location.hash !== '#' + page) {
+      window.history.pushState(null, '', '#' + page);
+    }
+    applyPage(page);
+    window.scrollTo(0, 0);
+  }
+
+  function setExportFormat(format) {
+    if (!['epub', 'txt', 'md'].includes(format)) { return; }
+    var select = $('#format-select');
+    if (select) { select.value = format; }
+    $all('[data-account-format]').forEach(function (button) {
+      var active = button.getAttribute('data-account-format') === format;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  }
+
+  function bindPageNavigation() {
+    document.addEventListener('click', function (event) {
+      var item = event.target.closest ? event.target.closest('[data-page-nav]') : null;
+      if (!item) { return; }
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) { return; }
+      event.preventDefault();
+      navigatePage(item.getAttribute('data-page-nav'));
+    });
+    window.addEventListener('popstate', function () { applyPage(pageFromHash()); });
+    window.addEventListener('hashchange', function () { applyPage(pageFromHash()); });
+    applyPage(pageFromHash());
+  }
 
   /** 切到别的浏览器标签页时也能从标题看到进度百分比。 */
   function updateTitle(snap) {
@@ -796,6 +858,7 @@
     if (card) { card.hidden = false; }
     setConnBadge(trackers[taskId] && trackers[taskId].pollOnly ? 'poll' : 'live');
     renderProgress(taskId);
+    navigatePage('tasks');
   }
 
   function hideProgress() {
@@ -1052,6 +1115,11 @@
     var empty = $('#tasks-empty');
     var count = $('#tasks-count');
     if (!list) { return; }
+    var activeCount = taskList.filter(function (task) { return !isFinal(task.status); }).length;
+    var navCount = $('#nav-tasks-count');
+    var mobileCount = $('#mobile-tasks-count');
+    if (navCount) { navCount.textContent = activeCount ? String(activeCount) : ''; }
+    if (mobileCount) { mobileCount.textContent = activeCount ? String(activeCount) : ''; }
     // 用户正在列表里操作（键盘焦点）时先不重绘，稍后再补
     if (list.contains(document.activeElement)) {
       window.setTimeout(function () { if (!renderQueued) { renderTasks(); } }, 1200);
@@ -1062,7 +1130,7 @@
       list.innerHTML = '';
       if (empty) {
         empty.hidden = false;
-        if (!empty.dataset.forced) { empty.textContent = '还没有任务。在左边粘贴一个知乎链接，点「开始下载」，这里会实时显示进度。'; }
+        if (!empty.dataset.forced) { empty.textContent = '还没有任务。创建下载后，任务进度与完成文件会显示在这里。'; }
       }
       return;
     }
@@ -1132,6 +1200,8 @@
     var empty = $('#shelf-empty');
     var count = $('#shelf-count');
     if (!list) { return; }
+    var navCount = $('#nav-local-count');
+    if (navCount) { navCount.textContent = shelfBooks.length ? String(shelfBooks.length) : ''; }
     if (count) { count.textContent = shelfBooks.length ? shelfBooks.length + ' 本' : ''; }
     if (!shelfBooks.length) {
       list.innerHTML = '';
@@ -1358,6 +1428,14 @@
   }
 
   function bind() {
+    bindPageNavigation();
+    setExportFormat($('#format-select').value);
+    $all('[data-account-format]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        setExportFormat(button.getAttribute('data-account-format'));
+      });
+    });
+    on('#format-select', 'change', function () { setExportFormat(this.value); });
     on('#theme-toggle', 'click', toggleTheme);
     on('#qr-btn', 'click', openQr);
     on('#qr-retry', 'click', createQr);
@@ -1365,6 +1443,7 @@
     on('#settings-btn', 'click', function () {
       if (settings.open) { closeSettings(); } else { openSettings(); }
     });
+    on('[data-open-settings]', 'click', openSettings);
     on('#nav-toggle', 'click', function () { toggleNav(); });
     on('#cookie-import-btn', 'click', importCookies);
     on('#logout-btn', 'click', function () {
