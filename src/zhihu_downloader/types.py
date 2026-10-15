@@ -153,6 +153,36 @@ class BookResult:
 # ----------------------------------------------------------------------
 
 @dataclass
+class AccountShelfBook:
+    """账号书架展示信息；url 仅在现有下载内核支持时填写。"""
+
+    id: str
+    title: str
+    kind: str
+    url: str = ""
+    source_url: str = ""
+    supported: bool = False
+    unsupported_reason: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class AccountShelfPage:
+    books: list[AccountShelfBook]
+    total: int
+    next_offset: int | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "books": [book.to_dict() for book in self.books],
+            "total": self.total,
+            "next_offset": self.next_offset,
+        }
+
+
+@dataclass
 class ShelfBook:
     """书架条目（shelf.json 持久化单元）。"""
 

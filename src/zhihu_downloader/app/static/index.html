@@ -48,6 +48,30 @@
     <div class="grid">
       <!-- 左栏：下载 + 进度 -->
       <div class="col">
+        <section class="card" aria-labelledby="account-title">
+          <div class="card-head">
+            <h2 id="account-title" class="card-title">账号书架</h2>
+            <button id="account-refresh" class="btn btn-outline btn-sm" type="button">读取书架</button>
+          </div>
+          <p class="muted card-desc">读取当前知乎账号的书架，直接选书下载。仅支持提供可用网页版链接的条目。</p>
+          <label class="field-label" for="account-search">搜索已加载书目</label>
+          <input id="account-search" type="search" placeholder="输入书名" autocomplete="off" />
+          <p id="account-count" class="field-help"></p>
+          <div class="account-toolbar">
+            <label><input id="account-select-all" type="checkbox" /> 全选当前结果中可下载的书</label>
+            <button id="account-download" class="btn btn-primary btn-sm" type="button" disabled>下载所选</button>
+          </div>
+          <p class="field-help">使用下方的导出格式、限速和断点续传设置。</p>
+          <p id="account-message" class="form-msg" role="status" aria-live="polite">登录后点「读取书架」，无需逐本复制链接。</p>
+          <ul id="account-list" class="shelf account-list" aria-label="账号书架条目"></ul>
+          <button id="account-more" class="btn btn-outline btn-block" type="button" hidden>加载更多</button>
+          <div id="account-queue-box" class="account-queue" hidden>
+            <h3 class="small">本次选书下载</h3>
+            <p class="field-help">关闭或刷新本页会停止提交等待中的书；已创建的下载任务会继续运行。</p>
+            <ul id="account-queue" aria-live="polite"></ul>
+          </div>
+        </section>
+
         <section class="card" aria-labelledby="download-title">
           <h2 id="download-title" class="card-title">下载一本盐选小说</h2>
           <p class="muted card-desc">
@@ -147,7 +171,7 @@
 
         <section class="card" aria-labelledby="shelf-title">
           <div class="card-head">
-            <h2 id="shelf-title" class="card-title">我的书架</h2>
+            <h2 id="shelf-title" class="card-title">本地书架</h2>
             <span id="shelf-count" class="muted small"></span>
           </div>
           <p id="shelf-empty" class="empty">书架还空着。下载成功后这本书会自动放进来，以后点「检查更新」就能追更新章节。</p>
@@ -265,6 +289,7 @@
     <p class="notice notice-warn">这个页面需要启用 JavaScript 才能使用，请在浏览器设置中允许脚本后刷新。</p>
   </noscript>
 
+  <script src="account-shelf.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -64,7 +64,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -73,10 +73,11 @@ from urllib3.util import parse_url as _urllib3_parse_url
 from .. import __version__
 from ..auth import cookies as cookie_store
 from ..auth import doctor, qr
+from ..engine.account_shelf import fetch_account_shelf
 from ..engine.checkpoint import CheckpointStore
 from ..engine.client import ZhihuClient
 from ..engine.fetcher import DEFAULT_STATE_SUBDIR, download_book, resolve_book
-from ..errors import CheckpointError, SaltError
+from ..errors import AuthError, CheckpointError, SaltError
 from ..export import FORMATS
 from ..shelf.shelf import Shelf
 from ..types import BookMeta, ProgressEvent
@@ -428,6 +429,22 @@ class _ServerState:
         self.tasks = TaskStore(TASK_LIMIT)
         self._executor: ThreadPoolExecutor | None = None
         self._executor_lock = threading.Lock()
+        self._account_lock = threading.Lock()
+        self._account_digest = ""
+        self._account_session = uuid.uuid4().hex
+
+    def account_session(self) -> str:
+        """Cookie 变动时轮换随机代号；代号不包含凭证且不能用于登录。"""
+        try:
+            data = cookie_store.load(_cookie_file_of(self.client))
+        except SaltError:
+            data = {}
+        digest = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+        with self._account_lock:
+            if digest != self._account_digest:
+                self._account_digest = digest
+                self._account_session = uuid.uuid4().hex
+            return self._account_session
 
     def executor(self) -> ThreadPoolExecutor:
         """懒创建下载执行线程池（max_workers=2，规格 §2.14）。"""
@@ -458,6 +475,7 @@ class DownloadRequest(BaseModel):
     resume: bool = True
     rate_limit: float | None = None
     workers: int | None = None
+    account_session: str | None = None
 
 
 class CookieImportRequest(BaseModel):
@@ -586,8 +604,15 @@ def create_app(
 
     _start_lock = threading.Lock()  # 「查重 URL → 入表」的原子性
 
-    def make_task_client(rate_limit: float | None) -> Any:
+    def make_task_client(rate_limit: float | None, fresh_auth: bool = False) -> Any:
         """为单个任务派生独立客户端（v4 竞态教训：绝不共享 session）。"""
+        if fresh_auth:
+            return ZhihuClient(
+                cookie_file=_cookie_file_of(state.client),
+                rate_limit=getattr(state.client, "rate_limit", 2.0) if rate_limit is None else rate_limit,
+                timeout=getattr(state.client, "timeout", 20.0),
+                retries=getattr(state.client, "retries", 3),
+            )
         copy_with = getattr(state.client, "copy_with", None)
         if callable(copy_with):
             try:
@@ -717,7 +742,8 @@ def create_app(
 
     def start_download_task(url: str, fmt: str, resume: bool,
                             rate_limit: float | None, workers: int, kind: str,
-                            meta: BookMeta | None = None) -> Task:
+                            meta: BookMeta | None = None,
+                            account_session: str | None = None) -> Task:
         """建任务 → 派生专属 client → 入表 → 提交线程池。
 
         同一 URL 已有未终态任务时直接 400：重复提交既浪费带宽，两任务还会
@@ -741,7 +767,10 @@ def create_app(
                         detail="该链接已有任务正在进行中（任务 " + active.id +
                                "），请等待其完成后再发起。")
             task = Task(id=uuid.uuid4().hex[:12], kind=kind, url=url, fmt=fmt)
-            task.client = make_task_client(rate_limit)
+            task.client = make_task_client(rate_limit, fresh_auth=account_session is not None)
+            if account_session is not None and account_session != state.account_session():
+                task.client.session.close()
+                raise HTTPException(status_code=409, detail="登录信息已变化，请刷新账号书架后重新选书。")
             task.meta = meta
             state.tasks.add(task)
         state.executor().submit(run_download, task, resume, workers)
@@ -771,8 +800,9 @@ def create_app(
     # ------------------------------------------------------------------
 
     @app.get("/api/cookies")
-    def cookies_status() -> dict[str, bool]:
+    def cookies_status(response: Response) -> dict[str, bool]:
         """Cookie 状态布尔摘要：{has_cookie, z_c0, zse_ck, d_c0}，不含任何值。"""
+        response.headers["X-Account-Session"] = state.account_session()
         return _cookie_flags(_cookie_file_of(state.client))
 
     @app.post("/api/cookies/import", dependencies=[Depends(check_origin)])
@@ -822,6 +852,9 @@ def create_app(
     @app.post("/api/download", dependencies=[Depends(check_origin)])
     def start_download(payload: DownloadRequest) -> dict[str, Any]:
         """创建下载任务（异步执行）。SSRF/格式校验在提交前同步完成。"""
+        if (payload.account_session is not None
+                and payload.account_session != state.account_session()):
+            raise HTTPException(status_code=409, detail="登录信息已变化，请刷新账号书架后重新选书。")
         url = (payload.url or "").strip()
         if not url:
             raise HTTPException(
@@ -845,7 +878,7 @@ def create_app(
         if payload.workers is not None:
             workers = max(1, min(8, int(payload.workers)))
         task = start_download_task(url, fmt, bool(payload.resume), rate,
-                                   workers, kind="download")
+                                   workers, kind="download", account_session=payload.account_session)
         return {"task_id": task.id, "status": task.status}
 
     @app.get("/api/tasks")
@@ -923,6 +956,26 @@ def create_app(
     # ------------------------------------------------------------------
     # 书架（§2.14）
     # ------------------------------------------------------------------
+
+    @app.get("/api/account-shelf")
+    def account_shelf(offset: int = Query(0, ge=0, le=1_000_000),
+                      limit: int = Query(10, ge=1, le=50)) -> dict[str, Any]:
+        session_id = state.account_session()
+        if not _cookie_flags(_cookie_file_of(state.client))["z_c0"]:
+            raise HTTPException(status_code=401, detail="请先扫码登录知乎，再刷新账号书架。")
+        # 每次从文件构造会话；copy_with 会合并旧内存 Cookie，不适合跨账号读取。
+        client = ZhihuClient(cookie_file=_cookie_file_of(state.client), retries=2)
+        try:
+            page = fetch_account_shelf(client, offset, limit)
+        except AuthError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        except SaltError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        finally:
+            client.session.close()
+        if session_id != state.account_session():
+            raise HTTPException(status_code=409, detail="登录信息已变化，请刷新账号书架后重新选书。")
+        return {**page.to_dict(), "session_id": session_id}
 
     @app.get("/api/shelf")
     def shelf_list() -> list:

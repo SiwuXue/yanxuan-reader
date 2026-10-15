@@ -103,6 +103,9 @@
       e.status = resp.status;
       throw e;
     }
+    if (path === '/api/cookies' && data && !opts.method) {
+      data.account_session = resp.headers.get('X-Account-Session') || '';
+    }
     return data;
   }
 
@@ -182,12 +185,14 @@
   /* ================= 登录态胶囊 ================= */
 
   var cookieState = { has_cookie: false, z_c0: false, zse_ck: false, d_c0: false, loaded: false };
+  var accountShelf = null;
 
   async function refreshCookieStatus() {
     var pill = $('#cookie-pill');
     var text = $('#cookie-pill-text');
     try {
       var data = await api('/api/cookies');
+      if (accountShelf) { accountShelf.setSession(data.account_session); }
       cookieState = {
         has_cookie: !!(data && data.has_cookie),
         z_c0: !!(data && data.z_c0),
@@ -337,6 +342,7 @@
     else if (status === 'confirmed') {
       stopQrPolling();
       showQrState('confirmed');
+      if (accountShelf) { accountShelf.reset(); }
       refreshCookieStatus();
       toast('ok', '登录成功');
       window.setTimeout(closeQr, 1400);
@@ -933,6 +939,7 @@
         return !merged.some(function (m) { return m.id === t.id; });
       });
       taskList = keep.concat(merged);
+      if (accountShelf) { accountShelf.updateTasks(incoming); }
       renderTasks();
       // 有进行中的任务且没有跟踪器时补挂上
       taskList.forEach(function (t) {
@@ -1220,6 +1227,7 @@
     if (btn) { btn.disabled = true; btn.textContent = '正在导入…'; }
     try {
       await api('/api/cookies/import', { method: 'POST', body: JSON.stringify({ raw: raw }) });
+      if (accountShelf) { accountShelf.reset(); }
       showCookieMsg('ok', 'Cookie 已保存。');
       if (box) { box.value = ''; }
       await refreshCookieStatus();
@@ -1241,6 +1249,7 @@
   async function doLogout() {
     try {
       await api('/api/cookies', { method: 'DELETE' });
+      if (accountShelf) { accountShelf.reset('已退出登录，请先扫码登录再读取账号书架。'); }
       hideLogoutConfirm();
       await refreshCookieStatus();
       toast('ok', '已退出登录。');
@@ -1401,6 +1410,16 @@
 
   function init() {
     initTheme();
+    accountShelf = window.createAccountShelf({
+      api: api, escapeHtml: escapeHtml, refreshAuth: refreshCookieStatus,
+      settings: function () {
+        var rawRate = $('#rate-input').value.trim();
+        return { format: $('#format-select').value, resume: $('#resume-input').checked,
+          rate_limit: rawRate === '' || isNaN(Number(rawRate)) ? 2 : clamp(Number(rawRate), 0, 20) };
+      },
+      onTask: function (id) { trackTask(id); focusProgress(id); refreshTasks(); }
+    });
+    accountShelf.bind();
     bind();
     refreshCookieStatus();
     refreshTasks();
@@ -1409,6 +1428,7 @@
     // 兜底：服务端重启或列表外变化时，30s 温和同步一次（页签隐藏时跳过）
     window.setInterval(function () {
       if (document.hidden) { return; }
+      refreshCookieStatus();
       refreshTasks();
     }, 30000);
   }

@@ -23,6 +23,19 @@
 | 7 | `unknown` | `https://example.com/x`、空串、乱码、无法解析的 URL | 主机不是 `zhihu.com` 及其子域，或 URL 解析抛错 | ❌ | 直接报 `UnsupportedUrlError`，中文提示「不是知乎系域名或格式有误」；解析异常不会崩栈 | 改贴知乎回答 / 盐选专栏 / 章节链接；Web 端 `POST /api/download` 另有同解析器闸门（见下方「闸门口径」） |
 | — | （兜底）`column` | `https://www.zhihu.com/topic/19550980` 等其余知乎页 | 前六条都不匹配的知乎系页面 | ⚠️ | 沿用旧版行为按**专栏目录页**处理：能解析出章节列表就下载，解析不出就报 `ParseError`（消息含下一步） | 非盐选内容建议逐篇用 `answer` / `zhuanlan` 链接下载 |
 
+## 账号书架
+
+`GET /api/account-shelf?offset=0&limit=10` 使用现有 Cookie 读取只读的知乎账号书架，返回
+`books`、`total`、`next_offset`、`session_id`。每条书目含 `id/title/kind/url/source_url/supported/unsupported_reason`。
+只对接口明确提供的受支持网页版 URL 开放下载；`supported` 表示链接类型受支持，不承诺阅读权限或正文可用。
+新版 `work/short_story` 条目没有有效网页版链接时禁用下载，Live、音视频与仅 App 链接同样显示原因。
+
+书架列表不在服务器或浏览器磁盘缓存。分页仅接受数字偏移，不直接跟随远端返回的任意 URL。
+`GET /api/cookies` 的 JSON 布尔字段保持不变，额外响应头 `X-Account-Session` 是随机会话代号，
+不含 Cookie，不能用于登录；Cookie 文件变动会轮换代号。
+选书下载在原 `POST /api/download` 中附带可选的 `account_session`，旧代号提交返回 409。
+批量队列位于当前页面内存，复用现有任务和 SSE；关闭页面不再提交待下载书目，已创建任务继续运行。
+
 ## 中断与失败行为（与链接类型正交）
 
 | 情形 | 支持状态 | 实际行为 | 下一步 |
