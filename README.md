@@ -35,13 +35,46 @@ macOS 将文件名换成 `zhihu-downloader-5.0.3-macos-arm64`。当前未提供 
 
 单章节链接只下载该章节；需要整本时，请提供专栏目录链接。仅用于备份本人有权访问的内容，付费正文仍需账号具有相应阅读权限。
 
+## 界面预览
+
+下面展示盐选书房重设计界面的高保真原型截图，涵盖账号书架、本地书架、链接下载、下载任务和设置与关于。截图中的账号、书籍与任务均为虚构示例数据；截图仅展示界面，不连接真实账号，也不执行下载。本仓库只收录预览图片，不包含可交互原型文件。
+
+<p align="center">
+  <img src="docs/readme-assets/ui-preview/01-account-shelf.png" alt="账号书架桌面界面原型" width="800">
+  <br><em>账号书架 · 桌面</em>
+</p>
+
+<details>
+<summary>查看其他页面、深色主题和手机布局</summary>
+
+<table>
+  <tr>
+    <td><img src="docs/readme-assets/ui-preview/02-local-shelf.png" alt="本地书架桌面界面原型" width="600"></td>
+    <td><img src="docs/readme-assets/ui-preview/03-link-download.png" alt="链接下载桌面界面原型" width="600"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/readme-assets/ui-preview/04-download-tasks.png" alt="下载任务桌面界面原型" width="600"></td>
+    <td><img src="docs/readme-assets/ui-preview/05-settings-about.png" alt="设置与关于桌面界面原型" width="600"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/readme-assets/ui-preview/10-account-dark.png" alt="账号书架深色主题界面原型" width="600"></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/readme-assets/ui-preview/11-mobile-account.png" alt="账号书架手机界面原型" width="240">
+  <img src="docs/readme-assets/ui-preview/12-mobile-tasks.png" alt="下载任务手机界面原型" width="240">
+</p>
+</details>
+
 ## 功能
 
 - **字体解码**：识别页面内嵌字体，按实际字体分别还原字符，必要时通过字形 OCR 解码。
 - **三种导出格式**：EPUB 适合阅读器，TXT 便于纯文本阅读，Markdown 保留结构。
 - **断点续传**：保留已完成章节，中断后再次下载同一链接可继续。
-- **账号书架**：使用当前登录读取知乎书架，支持分页、搜索已加载书名、单本和勾选批量下载；任务满时等待空位，失败可逐本重试。
+- **账号书架**：使用当前登录读取知乎书架，支持分页、搜索已加载书名、单本和勾选批量下载；批量任务等待空位、跳过重复任务，失败可逐本重试。
 - **本地书架**：管理下载记录，检查并下载新增章节。
+- **新版书房界面**：包含账号书架、本地书架、链接下载、下载任务、设置与关于五个页面；桌面使用侧边导航，手机使用底部导航和紧凑布局，并支持浅色、深色主题切换。
 - **多种登录方式**：扫码登录，或导入 JSON、Netscape cookies.txt、原始 Cookie 字符串。
 - **命令行操作**：支持批量链接、输出目录、限速和环境诊断。
 
