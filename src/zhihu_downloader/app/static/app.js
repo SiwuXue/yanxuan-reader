@@ -141,10 +141,17 @@
     document.documentElement.setAttribute('data-theme', theme);
     var btn = $('#theme-toggle');
     if (btn) {
-      btn.textContent = theme === 'dark' ? '☀' : '☾';
+      btn.innerHTML = theme === 'dark' ?
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>' :
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.5A9 9 0 0 1 10.5 3.3 9 9 0 1 0 20.5 13.5z"></path></svg>';
       btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
       btn.setAttribute('title', theme === 'dark' ? '切换到浅色' : '切换到深色');
     }
+    $all('[data-theme-choice]').forEach(function (choice) {
+      var active = choice.getAttribute('data-theme-choice') === theme;
+      choice.classList.toggle('active', active);
+      choice.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
   }
 
   function initTheme() {
@@ -204,6 +211,7 @@
       cookieState = { has_cookie: false, z_c0: false, zse_ck: false, d_c0: false, loaded: false };
       if (pill) { pill.className = 'status-pill status-unknown'; }
       if (text) { text.textContent = '状态未知'; }
+      renderSettingsAccountState();
       renderCookieDetail();
       return;
     }
@@ -217,6 +225,7 @@
       else if (!cookieState.d_c0) { text.textContent = '签名 Cookie 缺失'; }
       else { text.textContent = '已登录'; }
     }
+    renderSettingsAccountState();
     var hint = $('#login-hint');
     if (hint) { hint.hidden = cookieState.has_cookie && cookieState.d_c0; }
     if (pill) {
@@ -227,6 +236,31 @@
       pill.setAttribute('aria-label', (text ? text.textContent : '登录状态') + '，点开设定查看登录详情');
     }
     renderCookieDetail();
+  }
+
+  function renderSettingsAccountState() {
+    var badge = $('#settings-cookie-status');
+    var title = $('#settings-cookie-title');
+    var description = $('#settings-cookie-description');
+    var login = $('#settings-login-btn');
+    var state = !cookieState.loaded ? 'unknown' :
+      (!cookieState.has_cookie ? 'off' : (!cookieState.d_c0 ? 'warn' : 'on'));
+    if (badge) {
+      badge.className = 'account-state account-state-' + state;
+      badge.textContent = state === 'on' ? '已就绪' : state === 'warn' ? '凭证不完整' :
+        state === 'off' ? '未登录' : '状态未知';
+    }
+    if (title) {
+      title.textContent = state === 'on' ? '知乎账号已连接' :
+        state === 'warn' ? '登录凭证需要更新' : state === 'off' ? '尚未连接知乎账号' : '无法读取登录状态';
+    }
+    if (description) {
+      description.textContent = state === 'on' ? '当前设备已保存登录凭证，可以读取账号书架。' :
+        state === 'warn' ? '签名 Cookie 缺失，请重新扫码或手动导入。' :
+          state === 'off' ? '扫码连接知乎后，即可读取账号书架。登录凭证只保存在本机。' :
+            '请确认本机服务正在运行，然后重试。';
+    }
+    if (login) { login.textContent = state === 'on' ? '重新扫码登录' : '扫码登录'; }
   }
 
   function renderCookieDetail() {
@@ -827,6 +861,11 @@
       button.classList.toggle('active', active);
       button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
+    $all('[data-download-format]').forEach(function (button) {
+      var active = button.getAttribute('data-download-format') === format;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
   }
 
   function bindPageNavigation() {
@@ -946,6 +985,7 @@
 
   var taskList = [];      // 归一化后的摘要
   var refreshQueued = false;
+  var taskFilter = 'all';
 
   function mergeTaskIntoList(snap) {
     var found = false;
@@ -1064,6 +1104,7 @@
     var name = task.title ? escapeHtml(task.title) : '<span class="muted">' + escapeHtml(task.url || '未命名任务') + '</span>';
     var html = '<li class="task task-' + escapeHtml(task.status) + (task.id === focusedTask ? ' is-focused' : '') +
       '" data-task="' + escapeHtml(task.id) + '">';
+    html += '<span class="task-thumb" aria-hidden="true"><span>' + escapeHtml((task.title || '盐选书房').slice(0, 6)) + '</span></span>';
     html += '<div class="task-head">';
     html += '<button class="task-main" type="button" data-action="focus" title="在上方查看进度">';
     html += '<span class="task-title">' + name + '</span>';
@@ -1125,17 +1166,43 @@
       window.setTimeout(function () { if (!renderQueued) { renderTasks(); } }, 1200);
       return;
     }
+    var counts = {
+      all: taskList.length,
+      active: taskList.filter(function (task) { return !isFinal(task.status); }).length,
+      done: taskList.filter(function (task) { return task.status === 'done'; }).length,
+      error: taskList.filter(function (task) { return task.status === 'error'; }).length,
+      running: taskList.filter(function (task) { return task.status === 'running'; }).length,
+      waiting: taskList.filter(function (task) { return ['pending', 'waiting'].includes(task.status); }).length
+    };
+    Object.keys(counts).forEach(function (key) {
+      var filterTarget = $('#task-filter-count-' + key);
+      var statTarget = $('#task-count-' + key);
+      if (filterTarget) { filterTarget.textContent = String(counts[key]); }
+      if (statTarget) { statTarget.textContent = String(counts[key]); }
+    });
+    $all('[data-task-filter]').forEach(function (button) {
+      var active = button.getAttribute('data-task-filter') === taskFilter;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
     if (count) { count.textContent = taskList.length ? taskList.length + ' 条' : ''; }
-    if (!taskList.length) {
+    var visibleTasks = taskList.filter(function (task) {
+      return taskFilter === 'all' ||
+        (taskFilter === 'active' ? !isFinal(task.status) : task.status === taskFilter);
+    });
+    if (!taskList.length || !visibleTasks.length) {
       list.innerHTML = '';
       if (empty) {
         empty.hidden = false;
-        if (!empty.dataset.forced) { empty.textContent = '还没有任务。创建下载后，任务进度与完成文件会显示在这里。'; }
+        if (!empty.dataset.forced) {
+          empty.textContent = taskList.length ? '这个分类下暂无任务。' :
+            '还没有任务。创建下载后，任务进度与完成文件会显示在这里。';
+        }
       }
       return;
     }
     if (empty) { empty.hidden = true; }
-    list.innerHTML = taskList.map(taskRow).join('');
+    list.innerHTML = visibleTasks.map(taskRow).join('');
     // CSSOM 赋宽：不受 style-src 限制，效果等同内联 style
     Array.prototype.forEach.call(list.querySelectorAll('.bar-fill[data-w]'), function (el) {
       el.style.width = (el.getAttribute('data-w') || '0') + '%';
@@ -1145,6 +1212,7 @@
   /* ================= 书架 ================= */
 
   var shelfBooks = [];
+  var shelfQuery = '';
 
   async function refreshShelf() {
     try {
@@ -1159,7 +1227,8 @@
           fmt: String(b.fmt || ''),
           files: Array.isArray(b.files) ? b.files : [],
           chapters: Array.isArray(b.chapter_urls) ? b.chapter_urls.length : (Number(b.chapters || 0) || 0),
-          updated_at: String(b.updated_at || b.downloaded_at || '')
+          updated_at: String(b.updated_at || b.downloaded_at || ''),
+          data_anomaly: String(b.data_anomaly || '')
         };
       }).filter(function (b) { return b.id; });
       renderShelf();
@@ -1173,24 +1242,27 @@
     }
   }
 
-  function shelfRow(book) {
+  function shelfRow(book, index) {
+    var palette = ['cover-1', 'cover-2', 'cover-3', 'cover-4', 'cover-5', 'cover-6'];
+    var variant = palette[index % palette.length];
     var html = '<li class="shelf-item" data-book="' + escapeHtml(book.id) + '">';
-    html += '<div class="shelf-head"><span class="shelf-title">' + escapeHtml(book.title) + '</span>';
+    html += '<div class="local-cover-stage"><div class="local-cover ' + variant + '" aria-hidden="true">';
+    html += '<small>YANXUAN · MY LIBRARY</small><span class="local-cover-title">' + escapeHtml(book.title) + '</span>';
+    html += '<span class="local-cover-foot">PERSONAL COLLECTION</span><i></i></div></div>';
+    html += '<div class="local-card-content"><div class="local-card-heading"><div class="local-card-title-wrap"><h3 class="shelf-title" title="' +
+      escapeHtml(book.title) + '">' + escapeHtml(book.title) + '</h3><p class="local-chapter-count">已保存 · ' + book.chapters + ' 章</p></div>';
     if (book.fmt) { html += '<span class="badge badge-fmt">' + escapeHtml(book.fmt) + '</span>'; }
     html += '</div>';
-    html += '<dl class="shelf-meta">';
-    html += '<div><dt>章节</dt><dd>' + book.chapters + ' 章</dd></div>';
-    html += '<div><dt>上次更新</dt><dd>' + escapeHtml(fmtTime(book.updated_at)) + '</dd></div>';
-    html += '</dl>';
     if (book.files.length) {
-      html += '<div class="file-links">' + book.files.map(function (f) {
-        return '<span class="file-chip">📄 ' + escapeHtml(baseName(f)) + '</span>';
+      html += '<div class="file-links local-file-links" aria-label="已导出的文件">' + book.files.map(function (f) {
+        return '<span class="file-chip">' + escapeHtml(baseName(f)) + '</span>';
       }).join('') + '</div>';
     }
-    html += '<div class="task-actions">';
-    html += '<button class="btn btn-outline btn-sm" type="button" data-action="shelf-update">检查更新</button>';
-    html += '<button class="btn btn-ghost btn-sm" type="button" data-action="shelf-remove">移除</button>';
-    html += '</div>';
+    if (book.data_anomaly) { html += '<p class="shelf-anomaly">' + escapeHtml(book.data_anomaly) + '</p>'; }
+    html += '<div class="local-card-footer"><span class="local-updated">' + escapeHtml(fmtTime(book.updated_at)) + '</span>';
+    html += '<div class="local-card-actions"><button class="btn btn-ghost btn-sm" type="button" data-action="shelf-update"' +
+      (book.data_anomaly ? ' disabled title="请先移除异常条目"' : '') + '>检查更新</button>';
+    html += '<button class="icon-btn" type="button" data-action="shelf-remove" aria-label="从本地书架移除《' + escapeHtml(book.title) + '》"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-14 0 1 14h10l1-14M9 7V4h6v3m-5 4v6m4-6v6"></path></svg></button></div></div></div>';
     html += '</li>';
     return html;
   }
@@ -1198,13 +1270,21 @@
   function renderShelf() {
     var list = $('#shelf-list');
     var empty = $('#shelf-empty');
+    var noResults = $('#shelf-no-results');
     var count = $('#shelf-count');
     if (!list) { return; }
+    var visibleBooks = shelfBooks.filter(function (book) {
+      return book.title.toLocaleLowerCase().includes(shelfQuery.trim().toLocaleLowerCase());
+    });
     var navCount = $('#nav-local-count');
     if (navCount) { navCount.textContent = shelfBooks.length ? String(shelfBooks.length) : ''; }
-    if (count) { count.textContent = shelfBooks.length ? shelfBooks.length + ' 本' : ''; }
+    if (count) {
+      count.textContent = shelfBooks.length ? (shelfQuery.trim() ? '找到 ' + visibleBooks.length + ' 本 · 共 ' + shelfBooks.length + ' 本' :
+        '共 ' + shelfBooks.length + ' 本 · 已保存在本机') : '已保存在本机';
+    }
     if (!shelfBooks.length) {
       list.innerHTML = '';
+      if (noResults) { noResults.hidden = true; }
       if (empty) {
         empty.hidden = false;
         if (!empty.dataset.forced) { empty.textContent = '书架还空着。下载成功后这本书会自动放进来，以后点「检查更新」就能追更新章节。'; }
@@ -1212,7 +1292,8 @@
       return;
     }
     if (empty) { empty.hidden = true; }
-    list.innerHTML = shelfBooks.map(shelfRow).join('');
+    if (noResults) { noResults.hidden = visibleBooks.length > 0; }
+    list.innerHTML = visibleBooks.map(shelfRow).join('');
   }
 
   async function shelfUpdate(bookId) {
@@ -1435,9 +1516,22 @@
         setExportFormat(button.getAttribute('data-account-format'));
       });
     });
+    $all('[data-download-format]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        setExportFormat(button.getAttribute('data-download-format'));
+      });
+    });
     on('#format-select', 'change', function () { setExportFormat(this.value); });
+    $all('[data-theme-choice]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var theme = button.getAttribute('data-theme-choice');
+        try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* 隐私模式忽略 */ }
+        applyTheme(theme);
+      });
+    });
     on('#theme-toggle', 'click', toggleTheme);
     on('#qr-btn', 'click', openQr);
+    on('#settings-login-btn', 'click', openQr);
     on('#qr-retry', 'click', createQr);
     on('#cookie-pill', 'click', openSettings);
     on('#settings-btn', 'click', function () {
@@ -1460,6 +1554,13 @@
     on('#url-input', 'input', function () { showUrlError(''); });
     on('#tasks-list', 'click', onTaskListClick);
     on('#shelf-list', 'click', onShelfClick);
+    on('#shelf-search', 'input', function () { shelfQuery = this.value; renderShelf(); });
+    on('#task-filters', 'click', function (event) {
+      var button = event.target.closest ? event.target.closest('[data-task-filter]') : null;
+      if (!button) { return; }
+      taskFilter = button.getAttribute('data-task-filter');
+      renderTasks();
+    });
     on('#prog-close', 'click', hideProgress);
     on('#prog-retry', 'click', function () {
       // 失败后一键重试：把原链接回填表单再提交，用户不用重新复制

@@ -7,7 +7,7 @@
     var cancel = opts.clearTimeout || root.clearTimeout.bind(root);
     var books = [], selected = new Set(), jobs = new Map();
     var session = '', epoch = 0, requestId = 0, loading = false, loaded = false;
-    var total = 0, next = null, pumping = false, timer = null;
+    var total = 0, next = null, pumping = false, timer = null, filterMode = 'all';
     var statuses = { queued: '等待提交', submitted: '下载中', done: '已完成', error: '失败', skipped: '已跳过重复任务' };
     function el(id) { return doc.querySelector('#account-' + id); }
     function esc(s) { return opts.escapeHtml(s); }
@@ -26,11 +26,20 @@
     function busy(job) { return job && (job.status === 'queued' || job.status === 'submitted'); }
     function visible() {
       var query = el('search').value.trim().toLocaleLowerCase();
-      return books.filter(function (b) { return b.title.toLocaleLowerCase().includes(query); });
+      return books.filter(function (b) {
+        var matchesFilter = filterMode === 'all' ||
+          (filterMode === 'available' ? b.supported : !b.supported);
+        return matchesFilter && b.title.toLocaleLowerCase().includes(query);
+      });
     }
     function render() {
       var list = visible();
       var available = list.filter(function (b) { return b.supported && !busy(jobs.get(b.id)); });
+      var filterCounts = {
+        all: books.length,
+        available: books.filter(function (b) { return b.supported; }).length,
+        unsupported: books.filter(function (b) { return !b.supported; }).length
+      };
       el('refresh').disabled = loading;
       el('refresh').textContent = loading ? '读取中…' : (loaded ? '刷新书架' : '读取书架');
       el('count').textContent = loaded ? '已加载 ' + books.length + ' / ' + total + ' 条 · 可下载 ' +
@@ -45,6 +54,13 @@
           '选择书籍后，可以批量保存到本机';
       }
       doc.body.classList.toggle('has-account-selection', selected.size > 0);
+      Array.prototype.forEach.call(doc.querySelectorAll('[data-account-filter]'), function (button) {
+        var active = button.getAttribute('data-account-filter') === filterMode;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        var count = button.querySelector('[data-account-filter-count]');
+        if (count) { count.textContent = String(filterCounts[button.getAttribute('data-account-filter')] || 0); }
+      });
       el('select-all').disabled = !available.length;
       var checked = available.filter(function (b) { return selected.has(b.id); }).length;
       el('select-all').checked = available.length > 0 && checked === available.length;
@@ -56,18 +72,20 @@
         var locked = !b.supported || busy(job);
         var action = job && job.status === 'error' ? '重试' : (job && job.status === 'done' ? '再次下载' : '下载');
         return '<li class="shelf-item' + (selected.has(b.id) ? ' is-selected' : '') + '"><div class="account-cover-stage">' +
+          '<label class="account-select-control"><input class="account-book-select" type="checkbox" data-account-select="' + esc(b.id) + '"' +
+          (locked ? ' disabled' : '') + (selected.has(b.id) ? ' checked' : '') + ' /><span class="visually-hidden">选择《' + esc(b.title) + '》</span></label>' +
           '<div class="account-cover" aria-hidden="true"><small>YANXUAN · MY LIBRARY</small><span class="account-cover-title">' +
           esc(b.title) + '</span><span class="account-cover-foot">' + esc(kindLabel(b.kind, b.supported)) +
-          '</span></div></div><div class="account-book-info"><div class="account-book-head">' +
-          '<label><input class="account-book-select" type="checkbox" data-account-select="' + esc(b.id) + '"' +
-          (locked ? ' disabled' : '') + (selected.has(b.id) ? ' checked' : '') + ' /><span class="shelf-title">' +
-          esc(b.title) + '</span></label>' + (b.supported ? '<button class="btn btn-outline btn-sm" type="button" data-account-download="' +
-          esc(b.id) + '"' + (locked ? ' disabled' : '') + '>' + action + '</button>' : '') + '</div>' +
+          '</span></div></div><div class="account-book-info"><div class="account-book-head"><span class="shelf-title">' +
+          esc(b.title) + '</span>' + (b.supported ? '<button class="card-download" type="button" data-account-download="' +
+          esc(b.id) + '" aria-label="' + action + '《' + esc(b.title) + '》"' + (locked ? ' disabled' : '') + '><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"></path></svg></button>' : '') + '</div>' +
           '<p class="account-book-reason' + (b.supported ? '' : ' is-unsupported') + '">' +
           esc(b.supported ? '支持网页下载' : b.unsupported_reason) + '</p></div></li>';
       }).join('');
       if (loaded && !list.length) {
-        el('list').innerHTML = '<li class="empty">' + (books.length ? '已加载书目中没有匹配结果。' : '当前账号书架为空。') + '</li>';
+        var emptyText = !books.length ? '当前账号书架为空。' :
+          (el('search').value.trim() ? '已加载书目中没有匹配结果。' : '这个筛选条件下没有书目。');
+        el('list').innerHTML = '<li class="empty shelf-empty-item">' + emptyText + '</li>';
       }
       el('queue-box').hidden = jobs.size === 0;
       el('queue').innerHTML = Array.from(jobs.values()).map(function (job) {
@@ -79,6 +97,7 @@
     function reset(text) {
       epoch += 1; requestId += 1;
       books = []; selected.clear(); jobs.clear(); total = 0; next = null; loaded = false; loading = false;
+      filterMode = 'all';
       el('search').value = '';
       if (timer !== null) { cancel(timer); timer = null; }
       message(text || '登录信息已变化，请重新读取账号书架。');
@@ -185,6 +204,17 @@
       el('refresh').addEventListener('click', function () { load(false); });
       el('more').addEventListener('click', function () { load(true); });
       el('search').addEventListener('input', render);
+      var filters = el('filters');
+      if (filters) {
+        filters.addEventListener('click', function (event) {
+          var button = event.target.closest('[data-account-filter]');
+          if (!button) { return; }
+          filterMode = button.getAttribute('data-account-filter');
+          render();
+          var active = filters.querySelector('[data-account-filter="' + filterMode + '"]');
+          if (active) { active.focus(); }
+        });
+      }
       el('download').addEventListener('click', function () { enqueue(Array.from(selected)); });
       el('select-all').addEventListener('change', function (event) {
         visible().forEach(function (book) {
@@ -204,7 +234,8 @@
         if (restored) { restored.focus(); }
       });
       el('list').addEventListener('click', function (event) {
-        var id = event.target.getAttribute('data-account-download');
+        var button = event.target.closest ? event.target.closest('[data-account-download]') : null;
+        var id = button && button.getAttribute('data-account-download');
         if (id) { enqueue([id]); }
       });
       el('queue').addEventListener('click', function (event) {

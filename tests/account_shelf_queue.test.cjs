@@ -12,7 +12,7 @@ function setup(config = {}) {
   const books = [1, 2, 3].map(id => ({ id: String(id), title: '测试书' + id,
     kind: 'paid_column', supported: true, url: 'https://www.zhihu.com/market/paid_column/' + id }));
   state.pages[0] = state.pages[0] || { books, total: 3, next_offset: null };
-  const document = { querySelector(selector) {
+  const document = { body: { classList: { toggle() {} } }, querySelectorAll() { return []; }, querySelector(selector) {
     if (!elements.has(selector)) {
       elements.set(selector, { value: '', textContent: '', innerHTML: '', listeners: {},
         addEventListener(type, fn) { this.listeners[type] = fn; } });
