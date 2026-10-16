@@ -18,8 +18,10 @@ v5 重构教训与安全承诺（逐条落实，均有对应测试见 tests/test
 - CSRF-lite（R2#P0-3）：本地服务零鉴权，但浏览器可从任意站点向本机端口发
   「简单请求」（不触发 CORS 预检）。所有 POST/DELETE /api/* 挂 check_origin
   依赖：带 Origin 或 Referer 头时，其 host 必须是 127.0.0.1 / localhost /
-  ::1（端口不限，GUI 端口会自动 +1），否则 403 中文；无 Origin/Referer
-  （curl/CLI/测试）放行；GET 是无副作用的读接口（Cookie 只回布尔）不查；
+  ::1（端口不限，GUI 端口会自动 +1），否则 403 中文；无 LAN 模式时无来源头
+  （curl/CLI/测试）放行。显式 LAN 模式还要求远程请求持有本次运行会话，写请求
+  必须来自公布地址的同源 Origin/Referer；其余静态文件、API、SSE 与导出文件
+  在解锁前拒绝。GET 是无副作用的读接口（Cookie 只回布尔），本机模式不查；
 - 攻击面收敛（R2#P0-3）：docs / redoc / openapi.json 全部关闭；所有响应带
   安全头（CSP default-src 'none'，img-src 放行知乎域供二维码直连；
   X-Content-Type-Options: nosniff；X-Frame-Options: DENY），未显式声明
@@ -81,6 +83,12 @@ from ..errors import AuthError, CheckpointError, SaltError
 from ..export import FORMATS
 from ..shelf.shelf import Shelf
 from ..types import BookMeta, ProgressEvent
+from .lan_access import (
+    LAN_SESSION_COOKIE,
+    LAN_UNLOCK_ASSETS,
+    LAN_UNLOCK_PATH,
+    LanAccessGuard,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -225,22 +233,36 @@ def check_origin(request: Request) -> None:
     http://127.0.0.1:<port> 发起「简单请求」（form POST 不触发 CORS 预检），
     借用户本机身份发起下载任务、导入 Cookie、发起扫码登录。CSRF-lite 缓解：
 
-    - 请求带 Origin 或 Referer 头时，其 host 必须 ∈ {127.0.0.1, localhost,
-      ::1}（端口不限——GUI 端口被占会自动 +1），否则 403 中文；
-    - 两个头都没有（curl / CLI / 离线测试客户端）放行——跨站表单请求在
-      现代浏览器必然带 Origin，缺失只可能是本机非浏览器调用；
+    - 本机模式：来源头存在时 host 必须 ∈ {127.0.0.1, localhost, ::1}；两个头
+      都没有时放行，兼容 curl / CLI / 离线测试客户端；
+    - LAN 模式：中间件先要求远程客户端持有本次会话；远程写请求还必须带有与
+      当前 Host 完全匹配、且指向启动时公布 IPv4 地址的 Origin/Referer；
     - GET 不挂本依赖：读接口无副作用、不回传 Cookie 值，无需拦截。
     """
     if request.method not in ("POST", "DELETE"):
         return
     source = request.headers.get("origin") or request.headers.get("referer")
+    guard: LanAccessGuard | None = getattr(request.app.state, "lan_access", None)
+    client_host = request.client.host if request.client is not None else ""
+    if guard is not None and not guard.is_local_client(client_host):
+        if source is not None and guard.origin_allowed(
+                source, request.headers.get("host", "")):
+            return
+        raise HTTPException(
+            status_code=403,
+            detail="局域网写操作必须来自当前访问地址。")
     if source is None:
         return
     if not _origin_host_allowed(source):
+        detail = (
+            "跨站请求已拒绝：本服务只接受来自本机（127.0.0.1 / localhost / ::1）"
+            "的写操作。若你正从其它站点打开本页面，请改用本机地址访问。"
+            if guard is None else
+            "跨站请求已拒绝：写操作必须来自本机或当前局域网访问地址。"
+        )
         raise HTTPException(
             status_code=403,
-            detail="跨站请求已拒绝：本服务只接受来自本机（127.0.0.1 / localhost / ::1）"
-                   "的写操作。若你正从其它站点打开本页面，请改用本机地址访问。")
+            detail=detail)
 
 
 def _task_run_dir(output_dir: Path, url: str) -> Path:
@@ -539,6 +561,8 @@ def create_app(
     client: ZhihuClient | None = None,
     output_dir: str | Path | None = None,
     shelf: Shelf | None = None,
+    lan_access_code: str | None = None,
+    lan_hosts: tuple[str, ...] | list[str] = (),
 ) -> FastAPI:
     """构造 FastAPI 应用（工厂模式：import 本模块不产生任何实例/副作用）。
 
@@ -547,6 +571,8 @@ def create_app(
             copy_with 派生独立实例，绝不共享 session。
         output_dir: 导出目录；None 时用 ~/.zhihu_downloader/output（规格 §3）。
         shelf: 书架实例；None 时用默认 ~/.zhihu_downloader/shelf.json。
+        lan_access_code: 显式启用局域网访问时的本次启动访问码；默认关闭。
+        lan_hosts: 局域网启动时公布的私有 IPv4 地址。
 
     Returns:
         配置好全部路由与静态挂载的 FastAPI 应用。
@@ -557,6 +583,8 @@ def create_app(
         output_dir=Path(output_dir) if output_dir else DEFAULT_OUTPUT_DIR,
         shelf=shelf if shelf is not None else Shelf(),
     )
+    lan_access = (LanAccessGuard(lan_access_code, lan_hosts)
+                  if lan_access_code is not None else None)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -568,13 +596,14 @@ def create_app(
     app = FastAPI(
         title="知乎盐选小说下载器",
         version=__version__,
-        description="本地 Web GUI 后端（规格书 §2.14）。默认只应监听 127.0.0.1。",
+        description="本地 Web GUI 后端。默认只监听 127.0.0.1；局域网访问需显式启用并验证访问码。",
         lifespan=lifespan,
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
     )
     app.state.zhihu = state
+    app.state.lan_access = lan_access
 
     @app.middleware("http")
     async def _security_headers(request: Request, call_next):
@@ -585,7 +614,32 @@ def create_app(
         - Cache-Control：仅对「未显式声明」的响应补 no-store（静态资源与
           Cookie 状态页防缓存）；SSE 端点自带 no-cache 语义，保持不动。
         """
-        response = await call_next(request)
+        response: Response
+        client_host = request.client.host if request.client is not None else ""
+        if lan_access is not None and not lan_access.is_local_client(client_host):
+            if not lan_access.is_lan_client(client_host):
+                response = JSONResponse(
+                    status_code=403,
+                    content={"detail": "局域网模式只接受私有 IPv4 网络的连接。"},
+                )
+            elif request.url.path == "/" and request.method in ("GET", "HEAD") \
+                    and not lan_access.authenticated(
+                        request.cookies.get(LAN_SESSION_COOKIE)):
+                response = FileResponse(STATIC_DIR / "lan-unlock.html")
+            elif (request.url.path in LAN_UNLOCK_ASSETS
+                  and request.method in ("GET", "HEAD")):
+                response = await call_next(request)
+            elif request.url.path == LAN_UNLOCK_PATH and request.method == "POST":
+                response = await call_next(request)
+            elif not lan_access.authenticated(request.cookies.get(LAN_SESSION_COOKIE)):
+                response = JSONResponse(
+                    status_code=401,
+                    content={"detail": "请先在局域网解锁页输入本次启动访问码。"},
+                )
+            else:
+                response = await call_next(request)
+        else:
+            response = await call_next(request)
         response.headers["Content-Security-Policy"] = _CSP_POLICY
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -794,6 +848,45 @@ def create_app(
     def health() -> dict[str, Any]:
         """存活探测 + 版本单源。"""
         return {"ok": True, "version": __version__}
+
+    @app.post(LAN_UNLOCK_PATH)
+    async def lan_unlock(request: Request, response: Response) -> dict[str, bool]:
+        """Verify the per-run LAN code and issue an in-memory browser session."""
+        if lan_access is None:
+            raise HTTPException(status_code=404, detail="局域网访问未启用。")
+
+        source = request.headers.get("origin") or request.headers.get("referer")
+        if (source is not None
+                and not lan_access.origin_allowed(source, request.headers.get("host", ""))):
+            raise HTTPException(status_code=403, detail="解锁请求必须来自当前局域网地址。")
+
+        client_host = request.client.host if request.client is not None else ""
+        if not lan_access.is_local_client(client_host) and not lan_access.is_lan_client(client_host):
+            raise HTTPException(status_code=403, detail="局域网模式只接受私有 IPv4 网络的连接。")
+
+        try:
+            payload = json.loads((await request.body())[:1024])
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            payload = None
+        code = payload.get("code", "") if isinstance(payload, dict) else ""
+        token, retry_after = lan_access.verify_code(str(code), client_host)
+        if retry_after:
+            raise HTTPException(
+                status_code=429,
+                detail="访问码错误次数过多，请稍后再试。",
+                headers={"Retry-After": str(retry_after)},
+            )
+        if token is None:
+            raise HTTPException(status_code=401, detail="访问码不正确，请核对启动窗口中的访问码。")
+
+        response.set_cookie(
+            LAN_SESSION_COOKIE,
+            token,
+            httponly=True,
+            samesite="strict",
+            path="/",
+        )
+        return {"ok": True}
 
     # ------------------------------------------------------------------
     # Cookie（只回布尔，绝不回传值）

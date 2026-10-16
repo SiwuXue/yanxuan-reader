@@ -19,8 +19,10 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import math
 import os
+import secrets
 import socket
 import sys
 import tempfile
@@ -555,6 +557,33 @@ def release_hint(current: str | None = None) -> str:
 def display_host(host: str) -> str:
     """给用户/浏览器看的地址：通配监听地址换成 127.0.0.1（0.0.0.0 打不开）。"""
     return GUI_DEFAULT_HOST if host in ("0.0.0.0", "::", "") else host
+
+
+def discover_lan_ipv4() -> tuple[str, ...]:
+    """Return the machine's unique RFC 1918 IPv4 addresses for LAN access URLs."""
+    networks = tuple(ipaddress.ip_network(value) for value in (
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
+    found: set[str] = set()
+    try:
+        addresses = socket.getaddrinfo(
+            socket.gethostname(), None, family=socket.AF_INET,
+            type=socket.SOCK_STREAM)
+    except OSError:
+        return ()
+    for address in addresses:
+        value = address[4][0]
+        try:
+            ip = ipaddress.IPv4Address(value)
+        except ipaddress.AddressValueError:
+            continue
+        if any(ip in network for network in networks):
+            found.add(str(ip))
+    return tuple(sorted(found))
+
+
+def generate_lan_access_code() -> str:
+    """Generate the numeric access code displayed for one LAN server run."""
+    return f"{secrets.randbelow(100_000_000):08d}"
 
 
 def is_loopback(host: str) -> bool:
@@ -1236,15 +1265,24 @@ def cmd_gui(args: argparse.Namespace) -> int:
     Returns:
         0 正常退出（含 Ctrl+C）；1 启动失败。
     """
-    host = str(getattr(args, "host", None) or GUI_DEFAULT_HOST)
+    lan_mode = bool(getattr(args, "lan", False))
+    host = "0.0.0.0" if lan_mode else str(getattr(args, "host", None) or GUI_DEFAULT_HOST)
     port = int(getattr(args, "port", GUI_DEFAULT_PORT) or GUI_DEFAULT_PORT)
+
+    lan_hosts: tuple[str, ...] = ()
+    access_code: str | None = None
+    if lan_mode:
+        lan_hosts = discover_lan_ipv4()
+        if not lan_hosts:
+            return fail("未检测到可用的局域网 IPv4 地址 → 请先连接 Wi-Fi 或检查网络配置后重试")
+        access_code = generate_lan_access_code()
 
     if not bool(getattr(args, "no_update_check", False)):
         hint = release_hint()
         if hint:
             echo(hint)
 
-    if not is_loopback(host):
+    if not lan_mode and not is_loopback(host):
         # 四条后果照 R2 建议稿写全；并按 S1 **已落地**的 server.check_origin 的真实边界
         # 说明它挡得住什么：只挂 POST/DELETE、Origin 与 Referer 两个头都缺即放行、GET 完全
         # 不设防。所以既不能写"无鉴权"（对浏览器跨站已不成立），也不能写"仅校验请求来自
@@ -1265,7 +1303,10 @@ def cmd_gui(args: argparse.Namespace) -> int:
                     " → 请重新安装：pip install -U zhihu-salt-novel-downloader；"
                     "或先用命令行下载：zhihu-downloader download --url <链接>")
     try:
-        app = create_app()
+        if lan_mode:
+            app = create_app(lan_access_code=access_code, lan_hosts=lan_hosts)
+        else:
+            app = create_app()
     except SaltError as exc:
         return fail(explain_failure(exc))
     except Exception as exc:  # noqa: BLE001
@@ -1279,15 +1320,26 @@ def cmd_gui(args: argparse.Namespace) -> int:
     if actual != port:
         warn(f"端口 {port} 已被占用，自动改用 {actual}")
 
+    local_url = f"http://{GUI_DEFAULT_HOST}:{actual}"
     url = f"http://{display_host(host)}:{actual}"
     echo("=" * 58)
-    echo(f"🚀 知乎盐选小说下载器 v{__version__} —— 本地 Web 界面")
-    echo(f"   📚 Web 界面: {url}")
+    echo(f"🚀 知乎盐选小说下载器 v{__version__} —— "
+         + ("局域网 Web 界面" if lan_mode else "本地 Web 界面"))
+    if lan_mode:
+        echo(f"   💻 本机访问: {local_url}")
+        echo("   📱 手机访问地址（请与电脑连接同一 Wi-Fi）：")
+        for lan_host in lan_hosts:
+            echo(f"      http://{lan_host}:{actual}")
+        echo(f"   🔐 本次启动访问码: {access_code}")
+        warn("安全提示：仅在可信的私人网络使用；局域网 HTTP 未加密，请勿配置公网端口转发。"
+             "如被 Windows 防火墙拦截，请手动允许专用网络访问。")
+    else:
+        echo(f"   📚 Web 界面: {url}")
     echo("   ⏹  按 Ctrl+C 停止服务")
     echo("=" * 58)
 
     if not bool(getattr(args, "no_browser", False)):
-        open_browser_later(url)
+        open_browser_later(local_url if lan_mode else url)
     try:
         serve_app(app, host, actual)
     except KeyboardInterrupt:
@@ -1383,8 +1435,11 @@ def build_parser() -> argparse.ArgumentParser:
                           help="跳过新版本检查（离线/CI 环境用）")
 
     p_gui = sub.add_parser("gui", help="启动本地 Web 界面并自动打开浏览器（无参数时的默认行为）")
-    p_gui.add_argument("--host", default=GUI_DEFAULT_HOST, metavar="H",
-                       help=f"监听地址（默认 {GUI_DEFAULT_HOST}；非回环地址会打印安全告警）")
+    host_group = p_gui.add_mutually_exclusive_group()
+    host_group.add_argument("--host", default=GUI_DEFAULT_HOST, metavar="H",
+                            help=f"监听地址（默认 {GUI_DEFAULT_HOST}；非回环地址会打印安全告警）")
+    host_group.add_argument("--lan", action="store_true",
+                            help="开启带访问码的局域网模式，供同一 Wi-Fi 中的手机访问")
     p_gui.add_argument("--port", type=int, default=GUI_DEFAULT_PORT, metavar="P",
                        help=f"监听端口（默认 {GUI_DEFAULT_PORT}，被占用时自动 +1 重试 "
                             f"{GUI_PORT_RETRIES} 次）")

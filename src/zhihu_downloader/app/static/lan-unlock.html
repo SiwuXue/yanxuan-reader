@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>盐选书房 · 局域网访问</title>
+  <link rel="stylesheet" href="/lan-unlock.css" />
+  <script src="/lan-unlock.js" defer></script>
+</head>
+<body>
+  <main class="unlock-card">
+    <div class="brand-mark" aria-hidden="true">书</div>
+    <p class="eyebrow">PRIVATE LIBRARY</p>
+    <h1>连接盐选书房</h1>
+    <p class="intro">输入电脑启动窗口中显示的 8 位访问码，即可在本设备上继续使用。</p>
+
+    <form id="unlock-form">
+      <label for="access-code">本次启动访问码</label>
+      <input id="access-code" name="code" type="text" inputmode="numeric"
+             autocomplete="one-time-code" pattern="[0-9]{8}" maxlength="8"
+             placeholder="输入 8 位数字" required autofocus />
+      <button id="unlock-button" type="submit">进入书房</button>
+      <p id="unlock-status" class="status" role="status" aria-live="polite"></p>
+    </form>
+
+    <p class="security-note">仅在可信的私人 Wi-Fi 中使用。局域网连接使用 HTTP，访问码和数据未加密传输；不要在公共网络使用或配置公网端口转发。</p>
+  </main>
+</body>
+</html>

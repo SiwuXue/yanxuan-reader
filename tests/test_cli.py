@@ -1811,7 +1811,8 @@ def test_importing_cli_does_not_import_web_layer() -> None:
     code = ("import sys, zhihu_downloader.cli as c;"
             "print('zhihu_downloader.app.server' in sys.modules)")
     proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
-                          cwd=str(src.parent), env={"PYTHONPATH": str(src), "HOME": "/tmp"},
+                          cwd=str(src.parent), env={"PYTHONPATH": str(src), "HOME": "/tmp",
+                                                    "USERPROFILE": str(src.parent)},
                           timeout=120)
     assert proc.returncode == 0, proc.stderr
     assert proc.stdout.strip() == "False"
@@ -1854,7 +1855,9 @@ def test_gui_free_port_uses_default(fake_server: dict, served: list, opened: lis
                                     monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli, "is_port_free", lambda host, port: True)
     assert cli.main(["gui", "--no-update-check"]) == 0
+    assert served[0]["host"] == "127.0.0.1"
     assert served[0]["port"] == 3000
+    assert fake_server["calls"][0][1] == {}
     assert opened == ["http://127.0.0.1:3000"]
 
 
@@ -1871,6 +1874,64 @@ def test_gui_no_browser_skips_open(fake_server: dict, served: list, opened: list
     monkeypatch.setattr(cli, "is_port_free", lambda host, port: True)
     assert cli.main(["gui", "--no-browser", "--no-update-check"]) == 0
     assert served and opened == []
+
+
+def test_lan_ip_discovery_lists_only_private_ipv4(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli.socket, "gethostname", lambda: "reader")
+    monkeypatch.setattr(cli.socket, "getaddrinfo", lambda *args, **kwargs: [
+        (cli.socket.AF_INET, cli.socket.SOCK_STREAM, 6, "", ("192.168.1.20", 0)),
+        (cli.socket.AF_INET, cli.socket.SOCK_STREAM, 6, "", ("10.0.0.8", 0)),
+        (cli.socket.AF_INET, cli.socket.SOCK_STREAM, 6, "", ("192.168.1.20", 0)),
+        (cli.socket.AF_INET, cli.socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0)),
+        (cli.socket.AF_INET, cli.socket.SOCK_STREAM, 6, "", ("169.254.1.3", 0)),
+    ])
+    assert cli.discover_lan_ipv4() == ("10.0.0.8", "192.168.1.20")
+
+
+def test_lan_code_is_eight_digits() -> None:
+    code = cli.generate_lan_access_code()
+    assert len(code) == 8 and code.isascii() and code.isdigit()
+
+
+def test_gui_lan_binds_all_interfaces_prints_phone_url_and_opens_local(
+    fake_server: dict, served: list, opened: list, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "discover_lan_ipv4", lambda: ("192.168.1.20", "10.0.0.8"))
+    monkeypatch.setattr(cli, "generate_lan_access_code", lambda: "12345678")
+    probed: list[tuple[str, int]] = []
+    monkeypatch.setattr(cli, "is_port_free",
+                        lambda host, port: (probed.append((host, port)) or port >= 3001))
+
+    assert cli.main(["gui", "--lan", "--no-update-check"]) == 0
+
+    assert probed == [("0.0.0.0", 3000), ("0.0.0.0", 3001)]
+    assert served[0]["host"] == "0.0.0.0" and served[0]["port"] == 3001
+    assert fake_server["calls"][0][1] == {
+        "lan_access_code": "12345678",
+        "lan_hosts": ("192.168.1.20", "10.0.0.8"),
+    }
+    assert opened == ["http://127.0.0.1:3001"]
+    out = capsys.readouterr().out
+    assert "http://192.168.1.20:3001" in out
+    assert "http://10.0.0.8:3001" in out
+    assert "本次启动访问码: 12345678" in out
+    assert "同一 Wi-Fi" in out
+
+
+def test_gui_lan_fails_when_no_private_ipv4(
+    fake_server: dict, served: list, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli, "discover_lan_ipv4", lambda: ())
+    assert cli.main(["gui", "--lan", "--no-update-check"]) == 1
+    assert served == []
+    assert "未检测到可用的局域网 IPv4 地址" in capsys.readouterr().err
+
+
+def test_lan_and_custom_host_are_mutually_exclusive() -> None:
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["gui", "--lan", "--host", "0.0.0.0"])
 
 
 def test_gui_warns_on_public_host(fake_server: dict, served: list, opened: list,
