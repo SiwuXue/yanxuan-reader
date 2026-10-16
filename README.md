@@ -6,26 +6,26 @@
 
 ## 下载与启动
 
-当前发布版本：**v5.0.3**。发布包包含 Python 运行环境、Web 界面和字体 OCR 模型，无需另行安装 Python。
+当前发布版本：**v5.1.0**。发布包包含 Python 运行环境、Web 界面和字体 OCR 模型，无需另行安装 Python。
 
 | 平台 | 下载 |
 | --- | --- |
-| Windows x64 | [zhihu-downloader-5.0.3-windows-x64.exe](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.3/zhihu-downloader-5.0.3-windows-x64.exe) |
-| macOS Apple Silicon（M 系列） | [zhihu-downloader-5.0.3-macos-arm64](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.3/zhihu-downloader-5.0.3-macos-arm64) |
-| Linux x64 | [zhihu-downloader-5.0.3-linux-x64](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.3/zhihu-downloader-5.0.3-linux-x64) |
+| Windows x64 | [zhihu-downloader-5.1.0-windows-x64.exe](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.1.0/zhihu-downloader-5.1.0-windows-x64.exe) |
+| macOS Apple Silicon（M 系列） | [zhihu-downloader-5.1.0-macos-arm64](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.1.0/zhihu-downloader-5.1.0-macos-arm64) |
+| Linux x64 | [zhihu-downloader-5.1.0-linux-x64](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.1.0/zhihu-downloader-5.1.0-linux-x64) |
 
 Windows 下载 `.exe` 后双击启动。程序会打开浏览器，默认地址为 `http://127.0.0.1:3000/`；端口被占用时会尝试后续端口，以启动日志显示的地址为准。使用期间保持程序运行，关闭浏览器标签不会停止后台服务。
 
 macOS 和 Linux 在下载目录打开终端，赋予执行权限后启动。例如 Linux：
 
 ```bash
-chmod +x zhihu-downloader-5.0.3-linux-x64
-./zhihu-downloader-5.0.3-linux-x64
+chmod +x zhihu-downloader-5.1.0-linux-x64
+./zhihu-downloader-5.1.0-linux-x64
 ```
 
-macOS 将文件名换成 `zhihu-downloader-5.0.3-macos-arm64`。当前未提供 Intel Mac 预构建包，可使用下方的源码运行方式。Linux 发布包在 Ubuntu 22.04 上构建。
+macOS 将文件名换成 `zhihu-downloader-5.1.0-macos-arm64`。当前未提供 Intel Mac 预构建包，可使用下方的源码运行方式。Linux 发布包在 Ubuntu 22.04 上构建。
 
-发布包暂未代码签名；系统可能显示来源或签名提示。文件完整性可对照 Release 附件 [SHA256SUMS.txt](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.0.3/SHA256SUMS.txt) 检查。
+发布包暂未代码签名；系统可能显示来源或签名提示。文件完整性可对照 Release 附件 [SHA256SUMS.txt](https://github.com/SiwuXue/yanxuan-reader/releases/download/v5.1.0/SHA256SUMS.txt) 检查。
 
 ## 三步开始使用
 
@@ -147,7 +147,19 @@ python -m zhihu_downloader gui
 
 ### 手机局域网访问
 
-局域网访问功能从源码运行时可用；当前 **v5.0.3 发布包尚未包含此功能**。先按上面的“从源码运行”完成依赖安装，然后在项目目录启动：
+v5.1.0 发布包和源码版本都支持手机局域网访问。Windows 用户在下载的 `.exe` 所在目录打开 PowerShell，运行：
+
+```powershell
+.\zhihu-downloader-5.1.0-windows-x64.exe gui --lan
+```
+
+macOS 或 Linux 用户在终端运行对应平台的程序并添加 `gui --lan`。例如 Linux：
+
+```bash
+./zhihu-downloader-5.1.0-linux-x64 gui --lan
+```
+
+从源码运行时，先按上面的步骤安装依赖，再在项目目录启动：
 
 ```bash
 python -m zhihu_downloader gui --lan
